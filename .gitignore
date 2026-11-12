@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+coverage/
+*.log
+backend/bin/
+backend/data/
+*.sqlite
+*.sqlite-*
+.DS_Store
+
+
+frontend/public/fonts/
