@@ -188,7 +188,8 @@
       "invalid_generation": "生成服務回傳的內容格式不符，請重試。",
       "generation_failed": "生成失敗，請稍後重試。",
       "body_too_large": "文檔內容超過儲存大小限制。",
-      "invalid_selection": "AI 修改超出選取範圍或內容限制，未套用任何修改。請重新選取後再試。"
+      "invalid_selection": "AI 修改超出選取範圍或內容限制，未套用任何修改。請重新選取後再試。",
+      "image_limit": "此簡報已達 200 張圖片上傳上限。"
     }
   },
   "models": {
@@ -311,6 +312,20 @@
     "generationProgress": "簡報生成進度",
     "backgroundNote": "生成會在背景繼續；離開頁面後可從「我的簡報」回來查看進度。",
     "cancel": "取消生成",
-    "cancelling": "正在取消…"
+    "cancelling": "正在取消…",
+    "uploadImage": "上傳圖片",
+    "uploadHint": "PNG 或 JPEG，最多 8 MiB、800 萬像素，長寬各不超過 4096。上傳後請儲存新版本。",
+    "uploadingImage": "正在上傳圖片…",
+    "imageSizeError": "圖片不可超過 8 MiB。"
+  },
+  "downloads": {
+    "word": "下載 Word",
+    "powerpoint": "下載 PowerPoint",
+    "pdf": "下載 PDF",
+    "preparing": "正在準備下載…",
+    "saveFirst": "請先儲存修改，再下載這一版產物。",
+    "failed": "下載失敗，請稍後重試。",
+    "assetsFailed": "無法載入匯出所需的圖片或字型，請檢查圖片網址或使用上傳圖片。",
+    "layoutFailed": "投影片文字過多，請縮短文字或分成更多頁後重新下載。"
   }
 }

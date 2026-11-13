@@ -1,0 +1,11 @@
+.git
+**/node_modules
+**/data
+**/bin
+**/*.sqlite*
+**/.env*
+**/coverage*
+**/dist
+**/.aws
+**/.codex
+**/.agents

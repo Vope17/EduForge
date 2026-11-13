@@ -28,6 +28,7 @@ function textSize(block: Block, isTitle = false) {
 
 function imageURL(block: Block) {
   if (!block.image_url) return undefined
+  if (/^\/api\/v1\/slides\/[a-f0-9]{32}\/images\/[a-f0-9]{32}$/.test(block.image_url)) return block.image_url
   try {
     const url = new URL(block.image_url)
     return url.protocol === 'https:' && !url.username && !url.password ? url.href : undefined

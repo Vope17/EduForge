@@ -3,7 +3,8 @@ name: eduforge
 services:
   backend:
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
       target: production
     environment:
       HTTP_ADDR: :8080
@@ -51,9 +52,12 @@ services:
       start_period: 5s
 
   backend-tools:
+    environment:
+      EDUFORGE_EXPORT_INTEGRATION: "1"
     profiles: [tools]
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
       target: development
     command: ["go", "test", "./..."]
 

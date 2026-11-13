@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import DownloadControls from '../DownloadControls.vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { documentErrorKey, uploadSlideImage } from '../../api/documents'
 import type { Block, BlockKind, Change, Content, PatchProposal, RevisionSummary, SavedDocument, SlideLayout, TemplateSpec } from '../../api/documents'
 import { useSelection, type Anchor } from '../../selection/useSelection'
 import SlideCanvas from './SlideCanvas.vue'
@@ -25,6 +27,10 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const layouts: SlideLayout[] = ['title_body', 'two_columns', 'image_text']
 const kinds: BlockKind[] = ['paragraph', 'list', 'image']
+const uploading = ref(false)
+const uploadError = ref('')
+const uploadController = new AbortController()
+const pending = computed(() => props.pending || uploading.value)
 const draft = ref<Content>({ title: '', blocks: [] })
 const pageIndex = ref(0)
 const elementIndex = ref(0)
@@ -57,6 +63,26 @@ const selection = useSelection(() => props.document.id, () => {
 const { anchors, rectangle } = selection
 const selected = computed(() => new Set(anchors.value.map((anchor) => anchor.block_id)))
 const notesSelected = computed(() => anchors.value.some((anchor) => anchor.block_id === page.value?.id && anchor.field === 'notes'))
+
+async function upload(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  const target = element.value
+  input.value = ''
+  if (!file || !target || pending.value) return
+  uploadError.value = ''
+  if (file.size > 8 * 1024 * 1024) { uploadError.value = 'slides.imageSizeError'; return }
+  uploading.value = true
+  try {
+    const url = await uploadSlideImage(props.document.id, file, uploadController.signal)
+    target.image_url = url
+    changed(target)
+  } catch (error) {
+    if (!uploadController.signal.aborted) uploadError.value = documentErrorKey(error)
+  } finally {
+    uploading.value = false
+  }
+}
 
 function reset() {
   draft.value = JSON.parse(JSON.stringify(props.document.content)) as Content
@@ -206,6 +232,7 @@ function playerKey(event: KeyboardEvent) {
 }
 
 onBeforeUnmount(() => {
+  uploadController.abort()
   selection.cancelRectangle()
   if (ownsFullscreen && document.fullscreenElement) void document.exitFullscreen().catch(() => { fullscreenFailed.value = true })
 })
@@ -213,6 +240,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="slides-workspace">
+    <DownloadControls :document="document" kind="slides" :disabled="pending" :dirty="dirty" />
     <div class="document-actions">
       <strong>{{ t('documents.editor.revision', { number: document.revision }) }}</strong>
       <span
@@ -462,11 +490,20 @@ onBeforeUnmount(() => {
               {{ t('documents.editor.imageURL') }}
               <input
                 v-model="element.image_url"
-                type="url"
+                type="text"
                 maxlength="2048"
                 @input="changed(element)"
               >
             </label>
+            <template v-if="element.kind === 'image'">
+              <label class="document-field">
+                {{ t('slides.uploadImage') }}
+                <input type="file" accept="image/png,image/jpeg" @change="upload">
+              </label>
+              <p class="document-muted">{{ t('slides.uploadHint') }}</p>
+              <p v-if="uploading" role="status">{{ t('slides.uploadingImage') }}</p>
+              <p v-if="uploadError" role="alert">{{ t(uploadError) }}</p>
+            </template>
             <div class="document-actions">
               <button
                 type="button"

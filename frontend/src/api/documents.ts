@@ -160,11 +160,24 @@ export const generationJobs = {
 }
 
 const errors = [
-  'invalid_selection', 'plan_permission', 'subscription_limit', 'not_found', 'invalid_input', 'version_conflict', 'generation_limit',
+  'image_limit', 'invalid_selection', 'plan_permission', 'subscription_limit', 'not_found', 'invalid_input', 'version_conflict', 'generation_limit',
   'provider_unavailable', 'invalid_generation', 'generation_failed', 'body_too_large',
 ] as const
 
 export function documentErrorKey(error: unknown) {
   const code = error instanceof DocumentError ? errors.find((item) => item === error.code) : undefined
   return 'documents.errors.' + (code ?? 'connection')
+}
+
+export async function uploadSlideImage(id: string, file: File, signal: AbortSignal): Promise<string> {
+  const response = await fetch('/api/v1/slides/' + encodeURIComponent(id) + '/images', {
+    method: 'POST', signal, headers: { 'Content-Type': 'application/octet-stream', 'X-EduForge-Upload': '1' }, body: file,
+  })
+  if (!response.ok) {
+    if (response.status === 413) throw new DocumentError('body_too_large')
+    const result = await response.json().catch(() => undefined) as { error?: { code?: string } } | undefined
+    throw new DocumentError(result?.error?.code ?? 'connection')
+  }
+  const result = await response.json() as { image_url: string }
+  return result.image_url
 }

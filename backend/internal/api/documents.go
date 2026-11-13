@@ -42,6 +42,8 @@ func (d *Documents) register(mux *http.ServeMux) {
 		prefix := "/api/v1/documents"
 		if kind == artifact.SlidesType {
 			prefix = "/api/v1/slides"
+			mux.HandleFunc(prefix+"/{id}/images", resource.checkType(resource.uploadImage))
+			mux.HandleFunc(prefix+"/{id}/images/{image}", resource.checkType(resource.image))
 		}
 		mux.HandleFunc(prefix, resource.collection)
 		for _, route := range []struct {
@@ -53,6 +55,7 @@ func (d *Documents) register(mux *http.ServeMux) {
 			{"/confirm", resource.confirm},
 			{"/generate", resource.generate},
 			{"/revisions", resource.revisions},
+			{"/download", resource.download},
 			{"/patches", resource.propose},
 			{"/patches/{proposal}/accept", resource.acceptProposal},
 			{"/patches/{proposal}/reject", resource.rejectProposal},

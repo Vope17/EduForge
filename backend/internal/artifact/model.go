@@ -120,8 +120,7 @@ func (b Block) Validate() error {
 			}
 		}
 	case "image":
-		parsed, err := url.Parse(b.ImageURL)
-		if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil || len(b.ImageURL) > 2048 ||
+		if !validImageURL(b.ImageURL) ||
 			len(b.Items) != 0 || len(b.Rows) != 0 {
 			return ErrInvalid
 		}
@@ -221,4 +220,27 @@ func (b Block) validateSlide() error {
 		return ErrInvalid
 	}
 	return nil
+}
+
+// LocalSlideImage accepts only canonical, server-issued asset paths.
+func LocalSlideImage(value string) (string, string, bool) {
+	parts := strings.Split(value, "/")
+	if len(parts) != 7 || parts[0] != "" || parts[1] != "api" || parts[2] != "v1" || parts[3] != "slides" || parts[5] != "images" {
+		return "", "", false
+	}
+	for _, id := range []string{parts[4], parts[6]} {
+		decoded, err := hex.DecodeString(id)
+		if err != nil || len(decoded) != 16 || strings.ToLower(id) != id {
+			return "", "", false
+		}
+	}
+	return parts[4], parts[6], true
+}
+
+func validImageURL(value string) bool {
+	if _, _, local := LocalSlideImage(value); local {
+		return true
+	}
+	parsed, err := url.Parse(value)
+	return err == nil && parsed.Scheme == "https" && parsed.Hostname() != "" && parsed.User == nil && len(value) <= 2048
 }

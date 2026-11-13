@@ -56,6 +56,9 @@ func readRevision(ctx context.Context, db queryer, user, id string, number int) 
 }
 
 func insertRevision(ctx context.Context, tx *sql.Tx, user, id string, number int, value revision) error {
+	if err := validateImageReferences(ctx, tx, user, id, value.content); err != nil {
+		return err
+	}
 	content, err := json.Marshal(value.content)
 	if err != nil {
 		return fmt.Errorf("encode revision: %w", err)

@@ -84,6 +84,9 @@ func TestSlidesHTTPGateJobAndResourceIsolation(t *testing.T) {
 		}
 	}
 	path := "/api/v1/slides/" + deck.ID
+	call("GET", path+"/download?format=pptx&revision=1", nil, 404)
+	call("GET", path+"/download?format=docx&revision=1", nil, 400)
+	call("GET", path+"/download?format=pptx&revision=0", nil, 400)
 	version := map[string]any{"template_version": 0}
 	call("POST", path+"/generate", version, 409)
 	call("POST", path+"/preview", map[string]any{"template_version": 0, "feedback": ""}, 200)

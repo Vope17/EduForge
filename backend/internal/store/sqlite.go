@@ -22,7 +22,8 @@ var (
 )
 
 type Store struct {
-	db *sql.DB
+	db       *sql.DB
+	imageDir string
 }
 
 func Open(ctx context.Context, path string) (*Store, error) {
@@ -41,7 +42,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	if err := db.PingContext(ctx); err != nil {
 		return nil, errors.Join(fmt.Errorf("connect SQLite: %w", err), db.Close())
 	}
-	return &Store{db: db}, nil
+	return &Store{db: db, imageDir: absolute + ".images"}, nil
 }
 
 func (s *Store) Close() error { return s.db.Close() }

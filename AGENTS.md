@@ -77,7 +77,7 @@ EduForge 是專為**教育工作者**設計的網站，用 AI 生成並編輯四
 
 ## 4. 常用指令
 
-> 指令透過 Docker Compose 執行，主機不需安裝 Go 或 Node.js。需有可存取的 Docker Engine 與 Compose v2.32 以上；首次建置需網路。啟動與模型連線設定見 `README.md`，文檔 API 與驗收見 `docs/m1.md`；修改簡報模型、樣板、背景生成或選取修改時，先讀 `docs/m4.md`。
+> 指令透過 Docker Compose 執行，主機不需安裝 Go 或 Node.js。需有可存取的 Docker Engine 與 Compose v2.32 以上；首次建置需網路。啟動與模型連線設定見 `README.md`，文檔 API 與驗收見 `docs/m1.md`；修改簡報模型、樣板、背景生成或選取修改時，先讀 `docs/m4.md`；修改下載、Office／PDF 渲染、匯出字型或容器依賴時，先讀 `docs/downloads.md`。
 
 ```bash
 make dev          # 啟動前後端開發容器；Compose Watch 同步修改
@@ -256,7 +256,7 @@ requested → template_generated → awaiting_confirmation → confirmed → gen
 
 - HTTP 路由器已確認為 `net/http`，資料存取已確認為 `database/sql`＋純 Go `modernc.org/sqlite`
 - 簡報已確認採用自建 Block 編輯器：縮圖導覽、標題／文字／圖片、講者備註、多區域選取與播放。樣板沿用配色、字型、語氣、內容密度，版面為 `title_body`／`two_columns`／`image_text`，確認前僅生成一頁少量範例。
-- PDF 渲染方案（無頭瀏覽器 / 純 Go PDF 函式庫）
+- PDF 匯出已確認參考 Paper2Lab：以 LibreOffice 無頭模式將同一份 DOCX／PPTX 轉為 PDF，使用獨立暫存目錄與 profile、context 逾時；這不代表 M5 獨立 PDF 產物流程已完成。
 - LLM 已確認支援 ChatGPT 訂閱方案 OAuth 與前端輸入 API key 的相容 API 連線；TTS、圖片/動畫生成的實際供應商仍待決策
 - 影片動畫的實作範圍（簡單轉場／鏡頭推移 vs. 真正的 AI 影像生成）
 - 行為回饋升格為偏好的門檻與衰減方式

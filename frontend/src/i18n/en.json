@@ -188,7 +188,8 @@
       "invalid_generation": "The generation service returned content in an invalid format. Please retry.",
       "generation_failed": "Generation failed. Try again shortly.",
       "body_too_large": "The document exceeds the save size limit.",
-      "invalid_selection": "The AI changes exceed the selection or content limits. No changes were applied. Select again and retry."
+      "invalid_selection": "The AI changes exceed the selection or content limits. No changes were applied. Select again and retry.",
+      "image_limit": "This presentation has reached the 200-image upload limit."
     }
   },
   "models": {
@@ -311,6 +312,20 @@
     "generationProgress": "Presentation generation progress",
     "backgroundNote": "Generation continues in the background. Return through My presentations to check progress.",
     "cancel": "Cancel generation",
-    "cancelling": "Cancelling…"
+    "cancelling": "Cancelling…",
+    "uploadImage": "Upload image",
+    "uploadHint": "PNG or JPEG, up to 8 MiB and 8 million pixels; each dimension up to 4096. Save a new revision after uploading.",
+    "uploadingImage": "Uploading image…",
+    "imageSizeError": "Images must not exceed 8 MiB."
+  },
+  "downloads": {
+    "word": "Download Word",
+    "powerpoint": "Download PowerPoint",
+    "pdf": "Download PDF",
+    "preparing": "Preparing download…",
+    "saveFirst": "Save your changes before downloading this version.",
+    "failed": "Download failed. Please try again.",
+    "assetsFailed": "Export images or fonts could not be loaded. Check image URLs or use uploaded images.",
+    "layoutFailed": "Slide text does not fit. Shorten it or split it across more slides before downloading."
   }
 }

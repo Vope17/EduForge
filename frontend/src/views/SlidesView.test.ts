@@ -125,6 +125,32 @@ describe('classroom slides', () => {
     expect(app.find('.slide-diff').exists()).toBe(false)
   })
 
+  it('uploads an image into the draft and saves it with the same block ID', async () => {
+    const deck = structuredClone(ready)
+    const id = 'a'.repeat(32)
+    deck.id = id
+    deck.content.blocks[0].children!.push({ id: 'illustration', kind: 'image', text: '水循環', image_url: '' })
+    const url = '/api/v1/slides/' + id + '/images/' + 'b'.repeat(32)
+    const fetchMock = vi.fn().mockResolvedValueOnce(json({ request: { ...pending, id, state: 'ready' }, document: deck }))
+      .mockResolvedValueOnce(json({ image_url: url }))
+      .mockImplementation(async (_url, options) => json({ ...deck, revision: 2, content: JSON.parse(options.body).content }))
+    vi.stubGlobal('fetch', fetchMock)
+    const app = await open('/slides/' + id)
+    await app.get('.slides-stage [data-slide-block-id="illustration"]').trigger('click')
+    const input = app.get('input[type="file"]')
+    const file = new File(['image'], 'diagram.png', { type: 'image/png' })
+    Object.defineProperty(input.element, 'files', { configurable: true, value: [file] })
+    await input.trigger('change')
+    await flushPromises()
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/slides/' + id + '/images')
+    expect(fetchMock.mock.calls[1][1].body).toBe(file)
+    expect(app.get('.slides-stage img').attributes('src')).toBe(url)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    await button(app, '儲存新版本').trigger('click')
+    await flushPromises()
+    expect(JSON.parse(fetchMock.mock.calls[2][1].body).content.blocks[0].children[2]).toMatchObject({ id: 'illustration', image_url: url })
+  })
+
   it('presents with keyboard navigation and speaker notes', async () => {
     Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value() { this.open = true } })
     Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value() { this.open = false } })

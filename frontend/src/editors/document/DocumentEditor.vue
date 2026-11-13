@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DownloadControls from '../DownloadControls.vue'
 import { computed, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -128,6 +129,7 @@ function save() {
 
 <template>
   <section class="document-panel">
+    <DownloadControls :document="document" kind="document" :disabled="pending" :dirty="dirty" />
     <div class="document-heading">
       <div>
         <p class="document-muted">{{ t('documents.editor.aiNotice') }}</p>
