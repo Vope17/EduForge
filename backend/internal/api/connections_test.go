@@ -2,7 +2,6 @@ package api
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,25 +11,12 @@ import (
 	"eduforge/backend/internal/llm"
 )
 
-type registrationStub struct{}
-
-func (registrationStub) ModelRegistration(context.Context, string) (string, string, string, error) {
-	return "urn:uuid:fixture", "", "", nil
-}
-func (registrationStub) SaveModelRegistration(context.Context, string, string, string) error {
-	return nil
-}
-
 func TestConnectionSettingsNeverReturnAPIKeyAndRejectCrossOrigin(t *testing.T) {
-	manager, err := llm.NewConnections("", "", "")
+	manager, err := llm.NewConnections("", "", "", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	oauth, err := llm.NewOAuth(registrationStub{}, manager, "http://127.0.0.1:8081")
-	if err != nil {
-		t.Fatal(err)
-	}
-	connections := NewModelConnections(manager, oauth, nil, 30)
+	connections := NewModelConnections(manager, nil, 30)
 	handler := NewHandler(nil, connections)
 	body := []byte(`{"endpoint":"https://provider.example/v1/chat/completions","model":"fixture","api_key":"private-test-key","version":0}`)
 

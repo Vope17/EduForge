@@ -14,19 +14,28 @@ import (
 	"eduforge/backend/internal/store"
 )
 
-const oauthCookie = "eduforge_oauth_binding"
-const callbackPath = "/api/v1/model-connection/chatgpt/callback"
-
 type ModelConnections struct {
 	manager *llm.Connections
-	oauth   *llm.OAuth
 	db      *store.Store
 	limit   int
 	csrf    string
 }
 
-func NewModelConnections(manager *llm.Connections, oauth *llm.OAuth, db *store.Store, limit int) *ModelConnections {
-	return &ModelConnections{manager: manager, oauth: oauth, db: db, limit: limit, csrf: artifact.NewID()}
+func NewModelConnections(manager *llm.Connections, db *store.Store, limit int) *ModelConnections {
+	return &ModelConnections{manager: manager, db: db, limit: limit, csrf: artifact.NewID()}
+}
+
+// modelPreferences stores the chosen ChatGPT model for the single local user.
+type modelPreferences struct{ db *store.Store }
+
+func ModelPreferences(db *store.Store) llm.Preferences { return modelPreferences{db} }
+
+func (p modelPreferences) ChatGPTModel(ctx context.Context) (string, error) {
+	return p.db.ChatGPTModel(ctx, defaultUser)
+}
+
+func (p modelPreferences) SaveChatGPTModel(ctx context.Context, model string) error {
+	return p.db.SaveChatGPTModel(ctx, defaultUser, model)
 }
 
 func (c *ModelConnections) register(mux *http.ServeMux) {
@@ -34,20 +43,19 @@ func (c *ModelConnections) register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/model-connection/test", c.test)
 	mux.HandleFunc("/api/v1/model-connection/models", c.models)
 	mux.HandleFunc("/api/v1/model-connection/chatgpt/login", c.login)
-	mux.HandleFunc(callbackPath, c.callback)
 }
 
 type connectionDTO struct {
-	Connected     bool   `json:"connected"`
-	Mode          string `json:"mode"`
-	Source        string `json:"source"`
-	Endpoint      string `json:"endpoint"`
-	Model         string `json:"model"`
-	Account       string `json:"account"`
-	Verified      bool   `json:"verified"`
-	Version       uint64 `json:"version"`
-	CSRFToken     string `json:"csrf_token"`
-	ChatGPTOrigin string `json:"chatgpt_origin"`
+	Connected        bool   `json:"connected"`
+	Mode             string `json:"mode"`
+	Source           string `json:"source"`
+	Endpoint         string `json:"endpoint"`
+	Model            string `json:"model"`
+	Account          string `json:"account"`
+	Verified         bool   `json:"verified"`
+	Version          uint64 `json:"version"`
+	CSRFToken        string `json:"csrf_token"`
+	ChatGPTAvailable bool   `json:"chatgpt_available"`
 }
 
 func (c *ModelConnections) status() connectionDTO {
@@ -55,7 +63,7 @@ func (c *ModelConnections) status() connectionDTO {
 	return connectionDTO{
 		Connected: current.Connected, Mode: current.Mode, Source: current.Source,
 		Endpoint: current.Endpoint, Model: current.Model, Account: current.Account, Verified: current.Verified,
-		Version: current.Version, CSRFToken: c.csrf, ChatGPTOrigin: c.oauth.Origin(),
+		Version: current.Version, CSRFToken: c.csrf, ChatGPTAvailable: c.manager.ChatGPTAvailable(),
 	}
 }
 
@@ -89,7 +97,7 @@ func (c *ModelConnections) settings(w http.ResponseWriter, r *http.Request) {
 		if !readJSON(w, r, &input) {
 			return
 		}
-		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 		defer cancel()
 		err := c.manager.SelectModel(ctx, input.Model, input.Version)
 		connectionRespond(w, r, c.status(), err)
@@ -100,14 +108,13 @@ func (c *ModelConnections) settings(w http.ResponseWriter, r *http.Request) {
 		if !readJSON(w, r, &input) {
 			return
 		}
-		c.oauth.Cancel()
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 		defer cancel()
-		revoked, err := c.manager.Disconnect(ctx, input.Version)
+		signedOut, err := c.manager.Disconnect(ctx, input.Version)
 		result := struct {
-			Connection    connectionDTO `json:"connection"`
-			RemoteRevoked bool          `json:"remote_revoked"`
-		}{c.status(), revoked}
+			Connection connectionDTO `json:"connection"`
+			SignedOut  bool          `json:"signed_out"`
+		}{c.status(), signedOut}
 		connectionRespond(w, r, result, err)
 	}
 }
@@ -152,7 +159,7 @@ func (c *ModelConnections) test(w http.ResponseWriter, r *http.Request) {
 		connectionRespond(w, r, nil, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
 	err := c.manager.Test(ctx, input.Version)
 	connectionRespond(w, r, c.status(), err)
@@ -162,66 +169,45 @@ func (c *ModelConnections) models(w http.ResponseWriter, r *http.Request) {
 	if !methodAllowed(w, r, http.MethodGet) {
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 	models, err := c.manager.Models(ctx)
 	connectionRespond(w, r, models, err)
 }
 
+type loginDTO struct {
+	Status   string `json:"status"`
+	UserCode string `json:"user_code,omitempty"`
+	URL      string `json:"verification_url,omitempty"`
+	Expires  string `json:"expires_at,omitempty"`
+}
+
+func newLoginDTO(state llm.LoginState) loginDTO {
+	result := loginDTO{Status: state.Status, UserCode: state.UserCode, URL: state.URL}
+	if !state.Expires.IsZero() {
+		result.Expires = state.Expires.UTC().Format(time.RFC3339)
+	}
+	return result
+}
+
+// login starts (POST) or reports (GET) the ChatGPT device-code sign-in.
 func (c *ModelConnections) login(w http.ResponseWriter, r *http.Request) {
-	if !methodAllowed(w, r, http.MethodPost) || !c.authorized(w, r) {
+	if !methodAllowed(w, r, http.MethodGet, http.MethodPost) {
 		return
 	}
-	var input struct {
-		NewAccount     bool `json:"new_account"`
-		RequestConsent bool `json:"request_consent"`
+	if r.Method == http.MethodGet {
+		writeJSON(w, r, http.StatusOK, newLoginDTO(c.manager.LoginStatus()))
+		return
 	}
+	if !c.authorized(w, r) {
+		return
+	}
+	var input struct{}
 	if !readJSON(w, r, &input) {
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	defer cancel()
-	authorizationURL, binding, err := c.oauth.Start(ctx, defaultUser, input.NewAccount, input.RequestConsent)
-	if err != nil {
-		connectionRespond(w, r, nil, err)
-		return
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name: oauthCookie, Value: binding, Path: callbackPath, HttpOnly: true,
-		SameSite: http.SameSiteLaxMode, MaxAge: 600,
-	})
-	connectionRespond(w, r, struct {
-		URL string `json:"authorization_url"`
-	}{authorizationURL}, nil)
-}
-
-func (c *ModelConnections) callback(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Referrer-Policy", "no-referrer")
-	if !methodAllowed(w, r, http.MethodGet) {
-		return
-	}
-	http.SetCookie(w, &http.Cookie{Name: oauthCookie, Path: callbackPath, MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
-	binding, cookieErr := r.Cookie(oauthCookie)
-	result := "expired"
-	if cookieErr == nil {
-		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-		defer cancel()
-		err := c.oauth.Complete(ctx, defaultUser, binding.Value, r.URL.Query())
-		switch {
-		case err == nil:
-			result = "success"
-		case errors.Is(err, llm.ErrAuthorizationDeny):
-			result = "denied"
-		case errors.Is(err, llm.ErrPlanPermission):
-			result = "permission"
-		case errors.Is(err, llm.ErrOAuthState):
-			result = "expired"
-		default:
-			result = "failed"
-		}
-	}
-	http.Redirect(w, r, c.oauth.Origin()+"/settings/models?oauth="+result, http.StatusSeeOther)
+	state, err := c.manager.StartLogin()
+	connectionRespond(w, r, newLoginDTO(state), err)
 }
 
 func connectionRespond(w http.ResponseWriter, r *http.Request, result any, err error) {

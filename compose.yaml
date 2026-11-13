@@ -6,9 +6,10 @@ services:
       context: .
       dockerfile: backend/Dockerfile
       target: production
+      args:
+        CODEX_VERSION: ${CODEX_VERSION:-0.167.1}
     environment:
       HTTP_ADDR: :8080
-      EDUFORGE_PUBLIC_ORIGIN: http://127.0.0.1:${EDUFORGE_PORT:-8081}
       EDUFORGE_DB: /data/eduforge.sqlite
       EDUFORGE_LLM_ENDPOINT: ${EDUFORGE_LLM_ENDPOINT:-}
       EDUFORGE_LLM_MODEL: ${EDUFORGE_LLM_MODEL:-}
@@ -16,6 +17,8 @@ services:
       EDUFORGE_DAILY_GENERATIONS: ${EDUFORGE_DAILY_GENERATIONS:-30}
     volumes:
       - document-data:/data
+      # ChatGPT sign-in kept by Codex CLI (auth.json); delete the volume to forget it.
+      - codex-data:/codex
     expose:
       - "8080"
     init: true
@@ -71,3 +74,4 @@ services:
 
 volumes:
   document-data:
+  codex-data:

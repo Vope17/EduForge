@@ -167,7 +167,7 @@ requested → template_generated → awaiting_confirmation → confirmed → gen
 ### 5.8 外部服務（LLM / TTS）
 
 - 所有 LLM、TTS 呼叫經由 `internal/llm`、`internal/tts` 的介面；業務邏輯不得 import 特定廠商 SDK。
-- **模型連線設定**（依使用者要求調整）：API 金鑰可由前端密碼欄位輸入並送至同源後端，送出與離開頁面時清空。後端從環境變數或本次執行的記憶體取得金鑰；不得寫入瀏覽器儲存、資料庫、日誌、版本控制或回應內容。ChatGPT OAuth 權杖亦只存於後端記憶體，回呼需驗證 state、PKCE、ID token 與方案使用權限。
+- **模型連線設定**（依使用者要求調整）：API 金鑰可由前端密碼欄位輸入並送至同源後端，送出與離開頁面時清空。後端從環境變數或本次執行的記憶體取得金鑰；不得寫入瀏覽器儲存、資料庫、日誌、版本控制或回應內容。ChatGPT 訂閱一律透過 Codex CLI（`codex app-server`）使用：登入憑證由 Codex 保存在 `CODEX_HOME`，EduForge 不得讀取、複製或儲存其中的權杖；啟動 Codex 時只傳必要環境變數，不得傳入 API 金鑰。
 - 設定每位使用者的生成次數/長度上限，避免失控成本；超限回傳明確的錯誤碼。
 - LLM 回傳需要結構化輸出時，必須做 schema 驗證，驗證失敗要重試或回報，不得直接信任。
 
@@ -257,7 +257,7 @@ requested → template_generated → awaiting_confirmation → confirmed → gen
 - HTTP 路由器已確認為 `net/http`，資料存取已確認為 `database/sql`＋純 Go `modernc.org/sqlite`
 - 簡報已確認採用自建 Block 編輯器：縮圖導覽、標題／文字／圖片、講者備註、多區域選取與播放。樣板沿用配色、字型、語氣、內容密度，版面為 `title_body`／`two_columns`／`image_text`，確認前僅生成一頁少量範例。
 - PDF 匯出已確認參考 Paper2Lab：以 LibreOffice 無頭模式將同一份 DOCX／PPTX 轉為 PDF，使用獨立暫存目錄與 profile、context 逾時；這不代表 M5 獨立 PDF 產物流程已完成。
-- LLM 已確認支援 ChatGPT 訂閱方案 OAuth 與前端輸入 API key 的相容 API 連線；TTS、圖片/動畫生成的實際供應商仍待決策
+- LLM 已確認支援經由 Codex CLI 的 ChatGPT 訂閱方案與前端輸入 API key 的相容 API 連線；TTS、圖片/動畫生成的實際供應商仍待決策
 - 影片動畫的實作範圍（簡單轉場／鏡頭推移 vs. 真正的 AI 影像生成）
 - 行為回饋升格為偏好的門檻與衰減方式
 - 使用者帳號與認證機制（目前決定：**先做單一使用者**、不做登入；資料表保留 `user_id`；多使用者前需先設計）

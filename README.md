@@ -1,6 +1,6 @@
 # EduForge
 
-教育工作者的 AI 教學內容平台。提供繁體中文／英文介面、教學文檔及課堂簡報工作區。需求、樣板版本與編輯紀錄存於 SQLite。生成由後端接入 ChatGPT 訂閱方案或支援結構化輸出的 Chat Completions 相容服務。
+教育工作者的 AI 教學內容平台。提供繁體中文／英文介面、教學文檔及課堂簡報工作區。需求、樣板版本與編輯紀錄存於 SQLite。生成由後端透過 Codex CLI 使用 ChatGPT 訂閱方案，或接入支援結構化輸出的 Chat Completions 相容服務。
 
 ## Docker 啟動
 
@@ -28,12 +28,14 @@ make down
 
 執行 `make up` 後，開啟 <http://localhost:8081/settings/models>，或使用頁首的「模型連線」。
 
-- **ChatGPT 訂閱方案**。按「使用 ChatGPT 繼續」，頁面切換到本機 `127.0.0.1` 網址並前往 OpenAI 授權。允許 EduForge 使用 ChatGPT 方案後，返回設定頁選擇帳號可用模型，套用並測試連線。可用性依帳號、方案及 OpenAI 的整合權限而定。
+- **ChatGPT 訂閱方案**。按「使用 ChatGPT 登入」，設定頁會顯示裝置代碼。開啟 OpenAI 登入頁、登入 ChatGPT 帳號並輸入代碼，完成後設定頁自動更新。預設使用 Codex 的預設模型，可改選帳號可用的模型，再測試連線。
 - **API key**。填入完整 HTTPS Chat Completions URL、模型名稱及金鑰，按「儲存 API 連線」，再按「測試連線」。服務須支援 `json_schema` 與 `max_completion_tokens`。
 
-金鑰送出後會清空欄位。金鑰及 OAuth 權杖只暫存在後端記憶體，後端重啟後需重新連線。連線資料僅在 SQLite 保留非機密的主機識別碼、OAuth client ID 與帳號 subject，供後續登入使用。
+金鑰送出後會清空欄位。API key 只暫存在後端記憶體，後端重啟後需重新設定。
 
-「中斷連線」會清除目前的連線。ChatGPT 連線亦會嘗試撤銷遠端授權，如果未能確認撤銷，設定頁會提示你至 ChatGPT 設定中中斷應用程式。
+ChatGPT 登入由後端映像內的 [Codex CLI](https://developers.openai.com/codex/cli) 處理（`codex app-server`，版本由 `CODEX_VERSION` 固定，預設 0.167.1）。登入憑證由 Codex 保存在 `codex-data` volume 的 `auth.json`，EduForge 不讀取也不儲存權杖。後端重啟後會自動恢復 ChatGPT 連線；SQLite 只保存所選模型。
+
+「中斷連線」會清除目前的連線；ChatGPT 連線會一併登出 Codex。刪除 `codex-data` volume 也會移除登入。生成時 Codex 以唯讀沙箱、停用指令、外掛、MCP 與網頁搜尋的方式執行，只回傳符合 JSON Schema 的內容。
 
 也可保留原有的後端環境變數設定方式。以下三個變數必須一起設定，供啟動時載入。
 
@@ -43,9 +45,7 @@ make down
 | `EDUFORGE_LLM_MODEL` | 端點支援的模型名稱 |
 | `EDUFORGE_LLM_API_KEY` | API 金鑰 |
 
-ChatGPT 訂閱採用官方本機應用程式 OAuth 流程，回呼為 `http://127.0.0.1:8081/api/v1/model-connection/chatgpt/callback`。使用 `EDUFORGE_PORT` 更換連接埠時，Compose 會同步設定 `EDUFORGE_PUBLIC_ORIGIN`。對外提供遠端服務前，須另外確認相應的 OpenAI client 註冊與部署條件。
-
-流程依據 [OpenAI 登入文件](https://developers.openai.com/siwc/token-sharing-open-source/sign-in) 與 [模型請求規格](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference)。
+ChatGPT 訂閱僅供登入者本人使用。多人共用的部署請改用各自的 API key。
 
 ## 課堂簡報
 

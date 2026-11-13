@@ -6,6 +6,7 @@ services:
     read_only: false
     volumes:
       - development-data:/data
+      - development-codex:/codex
     develop:
       watch:
         - action: sync+restart
@@ -49,3 +50,4 @@ services:
 
 volumes:
   development-data:
+  development-codex:

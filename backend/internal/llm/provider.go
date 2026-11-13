@@ -8,6 +8,8 @@ import (
 
 var ErrUnavailable = errors.New("generation provider is not configured")
 var ErrInvalidOutput = errors.New("invalid model output")
+var ErrPlanPermission = errors.New("ChatGPT plan permission not granted")
+var ErrSubscriptionLimit = errors.New("ChatGPT plan usage limit reached")
 
 type Request struct {
 	Instruction string

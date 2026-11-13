@@ -1,14 +1,23 @@
 export interface Connection {
   connected: boolean
   mode: '' | 'api_key' | 'chatgpt'
-  source: '' | 'environment' | 'session'
+  source: '' | 'environment' | 'session' | 'codex'
   endpoint: string
   model: string
   account: string
   verified: boolean
   version: number
   csrf_token: string
-  chatgpt_origin: string
+  /** Codex CLI is installed in the backend, so ChatGPT sign-in can be used. */
+  chatgpt_available: boolean
+}
+
+/** ChatGPT device-code sign-in through Codex CLI. */
+export interface LoginState {
+  status: 'idle' | 'pending' | 'connected' | 'failed'
+  user_code?: string
+  verification_url?: string
+  expires_at?: string
 }
 
 export interface APIKeyInput {
@@ -65,9 +74,10 @@ export const modelConnection = {
   test: (version: number, csrf: string, signal: AbortSignal) =>
     request<Connection>('/test', signal, 'POST', { version }, csrf),
   disconnect: (version: number, csrf: string, signal: AbortSignal) =>
-    request<{ connection: Connection; remote_revoked: boolean }>('', signal, 'DELETE', { version }, csrf),
-  login: (newAccount: boolean, requestConsent: boolean, csrf: string, signal: AbortSignal) =>
-    request<{ authorization_url: string }>('/chatgpt/login', signal, 'POST', { new_account: newAccount, request_consent: requestConsent }, csrf),
+    request<{ connection: Connection; signed_out: boolean }>('', signal, 'DELETE', { version }, csrf),
+  login: (csrf: string, signal: AbortSignal) =>
+    request<LoginState>('/chatgpt/login', signal, 'POST', {}, csrf),
+  loginStatus: (signal: AbortSignal) => request<LoginState>('/chatgpt/login', signal),
   models: (signal: AbortSignal) => request<ModelChoice[]>('/models', signal),
   selectModel: (model: string, version: number, csrf: string, signal: AbortSignal) =>
     request<Connection>('', signal, 'PATCH', { model, version }, csrf),

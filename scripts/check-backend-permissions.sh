@@ -12,5 +12,7 @@ docker compose run --rm --no-deps \
     /app/server migrate
     test -s /tmp/eduforge-permissions/test.sqlite
     test -w /tmp/eduforge-permissions/test.sqlite
-    echo "Backend identity and SQLite write permissions: OK"
+    test -w "$CODEX_HOME"
+    codex --version >/dev/null
+    echo "Backend identity, SQLite and Codex home write permissions: OK"
 '

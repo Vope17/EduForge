@@ -67,19 +67,20 @@ func run(ctx context.Context) (err error) {
 		os.Getenv("EDUFORGE_LLM_ENDPOINT"),
 		os.Getenv("EDUFORGE_LLM_MODEL"),
 		os.Getenv("EDUFORGE_LLM_API_KEY"),
+		&llm.Codex{}, api.ModelPreferences(db),
 	)
 	if err != nil {
 		return fmt.Errorf("configure LLM: %w", err)
 	}
-	origin := os.Getenv("EDUFORGE_PUBLIC_ORIGIN")
-	if origin == "" {
-		origin = "http://127.0.0.1:8081"
-	}
-	oauth, err := llm.NewOAuth(db, provider, origin)
-	if err != nil {
-		return fmt.Errorf("configure ChatGPT sign-in: %w", err)
-	}
-	connections := api.NewModelConnections(provider, oauth, db, limit)
+	// Reconnect to the ChatGPT sign-in Codex CLI kept in CODEX_HOME, without delaying startup.
+	go func() {
+		restoreCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		if err := provider.Restore(restoreCtx); err != nil {
+			slog.Warn("restore ChatGPT connection", "error", err)
+		}
+	}()
+	connections := api.NewModelConnections(provider, db, limit)
 	generation := generate.New(db, provider, limit)
 	if err := db.RecoverGenerationJobs(ctx); err != nil {
 		return fmt.Errorf("recover generation queue: %w", err)

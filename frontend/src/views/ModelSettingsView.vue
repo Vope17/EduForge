@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { connectionErrorKey, modelConnection, type Connection, type ModelChoice } from '../api/connections'
+import {
+  connectionErrorKey, modelConnection, type Connection, type LoginState, type ModelChoice,
+} from '../api/connections'
+
+const POLL_MS = 3000
 
 const { t } = useI18n()
-const route = useRoute()
-const router = useRouter()
 const controller = new AbortController()
 const connection = ref<Connection>()
 const method = ref<'chatgpt' | 'api_key'>('chatgpt')
@@ -18,13 +20,17 @@ const selectedModel = ref('')
 const busy = ref(false)
 const errorKey = ref('')
 const messageKey = ref('')
-const requestConsent = ref(false)
+const signIn = ref<LoginState>({ status: 'idle' })
+let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const statusKey = computed(() => {
   const current = connection.value
   if (!current?.connected) return 'models.disconnected'
-  if (current.mode === 'chatgpt' && !current.model) return 'models.chooseModelStatus'
   return current.verified ? 'models.tested' : 'models.configured'
+})
+const expiresAt = computed(() => {
+  const value = signIn.value.expires_at
+  return value ? new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
 })
 
 function applyConnection(value: Connection) {
@@ -55,10 +61,16 @@ async function fetchModels() {
   choices.value = await modelConnection.models(controller.signal)
 }
 
+async function refresh() {
+  applyConnection(await modelConnection.get(controller.signal))
+  if (connection.value?.mode === 'chatgpt') await fetchModels()
+}
+
 function load() {
   return run(async () => {
-    applyConnection(await modelConnection.get(controller.signal))
-    if (connection.value?.mode === 'chatgpt') await fetchModels()
+    await refresh()
+    const state = await modelConnection.loginStatus(controller.signal)
+    if (state.status === 'pending') waitForSignIn(state)
   })
 }
 
@@ -88,34 +100,59 @@ function disconnect() {
   if (!current) return
   return run(async () => {
     const result = await modelConnection.disconnect(current.version, current.csrf_token, controller.signal)
+    stopWaiting()
+    signIn.value = { status: 'idle' }
     applyConnection(result.connection)
     apiKey.value = ''
     choices.value = []
     selectedModel.value = ''
-    messageKey.value = result.remote_revoked ? 'models.disconnected' : 'models.revocationPending'
+    messageKey.value = result.signed_out ? 'models.disconnected' : 'models.signOutPending'
   })
 }
 
-function login(newAccount = false) {
+function stopWaiting() {
+  clearTimeout(pollTimer)
+  pollTimer = undefined
+}
+
+// Shows the device code and polls until the sign-in finishes in the other tab.
+function waitForSignIn(state: LoginState) {
+  signIn.value = state
+  stopWaiting()
+  if (state.status !== 'pending') return
+  pollTimer = setTimeout(async () => {
+    try {
+      const next = await modelConnection.loginStatus(controller.signal)
+      if (next.status === 'connected') {
+        signIn.value = next
+        await run(async () => {
+          await refresh()
+          messageKey.value = 'models.loginSuccess'
+        })
+      } else if (next.status === 'failed' || next.status === 'idle') {
+        signIn.value = next
+        errorKey.value = 'models.loginFailed'
+      } else waitForSignIn(next)
+    } catch {
+      if (!controller.signal.aborted) waitForSignIn(signIn.value)
+    }
+  }, POLL_MS)
+}
+
+function login() {
   const current = connection.value
   if (!current) return
-  if (window.location.origin !== current.chatgpt_origin) {
-    const target = new URL('/settings/models', current.chatgpt_origin)
-    target.searchParams.set('connect', newAccount ? 'new-chatgpt' : 'chatgpt')
-    window.location.assign(target.toString())
-    return
-  }
   return run(async () => {
-    const result = await modelConnection.login(newAccount, requestConsent.value, current.csrf_token, controller.signal)
-    const target = new URL(result.authorization_url)
-    if (target.protocol !== 'https:' || target.host !== 'auth.openai.com') throw new Error('invalid_authorization_url')
-    window.location.assign(target.toString())
+    const state = await modelConnection.login(current.csrf_token, controller.signal)
+    const target = new URL(state.verification_url ?? '')
+    if (target.protocol !== 'https:' || target.host !== 'auth.openai.com') throw new Error('invalid_login_url')
+    waitForSignIn(state)
   })
 }
 
 function selectModel() {
   const current = connection.value
-  if (!current || !selectedModel.value) return
+  if (!current) return
   return run(async () => {
     applyConnection(await modelConnection.selectModel(
       selectedModel.value, current.version, current.csrf_token, controller.signal,
@@ -124,25 +161,9 @@ function selectModel() {
   })
 }
 
-onMounted(async () => {
-  await load()
-  const oauth = String(route.query.oauth ?? '')
-  const resultKeys: Record<string, string> = {
-    success: 'models.loginSuccess', denied: 'models.oauthDenied', permission: 'models.oauthPermission',
-    expired: 'models.oauthExpired', failed: 'models.oauthFailed',
-  }
-  requestConsent.value = oauth === 'permission'
-  if (oauth && resultKeys[oauth]) {
-    messageKey.value = resultKeys[oauth]
-    await router.replace({ name: 'model-settings' })
-  }
-  const connect = route.query.connect
-  if ((connect === 'chatgpt' || connect === 'new-chatgpt') && connection.value) {
-    await router.replace({ name: 'model-settings' })
-    await login(connect === 'new-chatgpt')
-  }
-})
+onMounted(load)
 onBeforeUnmount(() => {
+  stopWaiting()
   controller.abort()
   apiKey.value = ''
 })
@@ -205,8 +226,8 @@ onBeforeUnmount(() => {
           <div v-if="connection.account">
             <dt>{{ t('models.account') }}</dt><dd>{{ connection.account }}</dd>
           </div>
-          <div v-if="connection.model">
-            <dt>{{ t('models.model') }}</dt><dd>{{ connection.model }}</dd>
+          <div v-if="connection.model || connection.mode === 'chatgpt'">
+            <dt>{{ t('models.model') }}</dt><dd>{{ connection.model || t('models.defaultModel') }}</dd>
           </div>
           <div v-if="connection.source === 'environment'">
             <dt>{{ t('models.source') }}</dt><dd>{{ t('models.serverSettings') }}</dd>
@@ -218,7 +239,7 @@ onBeforeUnmount(() => {
         >
           <button
             type="button"
-            :disabled="busy || !connection.model"
+            :disabled="busy"
             @click="test"
           >
             {{ t('models.test') }}
@@ -257,26 +278,46 @@ onBeforeUnmount(() => {
       >
         <h2>{{ t('models.subscription') }}</h2>
         <p>{{ t('models.subscriptionDescription') }}</p>
-        <p class="document-muted">
-          {{ t('models.loopbackNote') }}
+        <p
+          v-if="!connection.chatgpt_available"
+          class="document-error"
+        >
+          {{ t('models.codexMissing') }}
         </p>
-        <div class="document-actions">
+        <div
+          v-if="signIn.status === 'pending'"
+          class="sign-in-code"
+          role="status"
+        >
+          <p>{{ t('models.codeStep1') }}</p>
+          <a
+            class="document-primary"
+            :href="signIn.verification_url"
+            target="_blank"
+            rel="noopener noreferrer"
+          >{{ t('models.openSignIn') }}</a>
+          <p>{{ t('models.codeStep2') }}</p>
+          <output
+            class="sign-in-code-value"
+            data-sign-in-code
+          >{{ signIn.user_code }}</output>
+          <p class="document-muted">
+            {{ t('models.codeWaiting', { time: expiresAt }) }}
+          </p>
+        </div>
+        <div
+          v-else
+          class="document-actions"
+        >
           <button
+            v-if="connection.mode !== 'chatgpt'"
             type="button"
             class="document-primary"
-            data-oai-siwc-button
-            :disabled="busy"
-            @click="login()"
+            data-sign-in
+            :disabled="busy || !connection.chatgpt_available"
+            @click="login"
           >
             {{ t('models.continueChatGPT') }}
-          </button>
-          <button
-            v-if="connection.mode === 'chatgpt'"
-            type="button"
-            :disabled="busy"
-            @click="login(true)"
-          >
-            {{ t('models.otherAccount') }}
           </button>
           <a
             href="https://chatgpt.com/#settings/Usage"
@@ -284,6 +325,12 @@ onBeforeUnmount(() => {
             rel="noopener noreferrer"
           >{{ t('models.manageUsage') }}</a>
         </div>
+        <p
+          v-if="connection.mode === 'chatgpt'"
+          class="document-muted"
+        >
+          {{ t('models.switchAccount') }}
+        </p>
 
         <form
           v-if="connection.mode === 'chatgpt'"
@@ -294,13 +341,9 @@ onBeforeUnmount(() => {
             {{ t('models.model') }}
             <select
               v-model="selectedModel"
-              required
-              :disabled="busy || !choices.length"
+              :disabled="busy"
             >
-              <option
-                value=""
-                disabled
-              >{{ t('models.chooseModel') }}</option>
+              <option value="">{{ t('models.defaultModel') }}</option>
               <option
                 v-for="choice in choices"
                 :key="choice.id"
@@ -317,7 +360,7 @@ onBeforeUnmount(() => {
           <div class="document-actions">
             <button
               type="submit"
-              :disabled="busy || !selectedModel"
+              :disabled="busy || selectedModel === connection.model"
             >
               {{ t('models.applyModel') }}
             </button>
