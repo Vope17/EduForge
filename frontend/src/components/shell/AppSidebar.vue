@@ -46,7 +46,7 @@ function toggle(id: string) {
   <div v-if="state.nav" class="nav-backdrop" @click="state.nav = false"></div>
   <aside class="sidebar" :class="{ open: state.nav }">
     <a class="brand" href="#/" @click.prevent="go({ name: 'home', course: state.courseID })">
-      <span class="brand-symbol">P<span>2</span>L</span><span>Lesson<span class="brand-light">2</span>Lab</span>
+      <span class="brand-symbol">E<span>F</span></span><span>Edu<span class="brand-light">Forge</span></span>
     </a>
 
     <div class="sidebar-label">{{ t('courses') }}</div>

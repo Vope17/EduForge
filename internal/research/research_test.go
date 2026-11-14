@@ -46,3 +46,21 @@ func TestResolvedKnowledgeIssuesDoNotKeepArtifactsInDraft(t *testing.T) {
 		t.Fatalf("unresolved issue missing: %#v", check)
 	}
 }
+
+func TestRuleBasedKnowledgeSkipsPagesWithoutText(t *testing.T) {
+	src := domain.Source{Name: "scan.pdf", Role: "research", Parsed: &domain.Parsed{Units: []domain.Unit{
+		{ID: "a:p1", Kind: "page", Locator: 1, Mode: "vision"},
+		{ID: "a:p2", Kind: "page", Locator: 2, Mode: "text", Text: "Definition: speed is distance travelled per unit time."},
+	}}}
+	k := Extract("Speed", []domain.Record{{ID: "a", Kind: "source", Data: domain.Encode(src)}})
+	for _, c := range k.Claims {
+		if strings.TrimSpace(c.Text) == "" {
+			t.Fatalf("an empty point from a page with no text: %+v", c)
+		}
+	}
+	scanOnly := domain.Source{Name: "scan.pdf", Role: "research", Parsed: &domain.Parsed{Units: []domain.Unit{{ID: "b:p1", Kind: "page", Locator: 1, Mode: "vision"}}}}
+	k = Extract("Scan", []domain.Record{{ID: "b", Kind: "source", Data: domain.Encode(scanOnly)}})
+	if len(k.Claims) != 0 || len(k.Units) != 1 {
+		t.Fatalf("a scan alone has pages but no rule-based points until a model reads it: %d claims", len(k.Claims))
+	}
+}

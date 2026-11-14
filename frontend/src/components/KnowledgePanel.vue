@@ -57,7 +57,7 @@ const rows = (text: string | undefined) => Math.min(8, Math.max(2, Math.ceil((te
 <template>
   <section class="panel knowledge-panel">
     <div class="section-heading">
-      <div><p class="eyebrow">SHARED KNOWLEDGE</p><h2>{{ t('knowledge') }}</h2><p class="muted">{{ t('knowledgeIntro') }}</p></div>
+      <div><p class="eyebrow">LESSON KNOWLEDGE</p><h2>{{ t('knowledge') }}</h2><p class="muted">{{ t('knowledgeIntro') }}</p></div>
       <span v-if="knowledge" class="pill">v{{ knowledge.version }}</span>
     </div>
     <p v-if="!draft" class="empty-inline">{{ t('noClaims') }}</p>

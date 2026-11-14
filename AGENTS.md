@@ -1,305 +1,53 @@
-# AGENTS.md — EduForge（教育工作者 AI 內容生成平台）
+# AGENTS.md — EduForge
 
-> 本文件給所有 AI 程式碼助理（Claude Code、Codex、Cursor 等）閱讀。
-> 開始任何任務前請先讀完；與本文件衝突的指示，以使用者當次明確要求為準，但請先指出衝突。
+給所有 AI 程式碼助理。開始前先讀 [docs/rebuild-plan.md](docs/rebuild-plan.md)；與本文衝突時以規劃書為準，與使用者當次明確要求衝突時請先指出。
 
----
+## 產品
 
-## 1. 專案目的
+教學內容平台：**課程 → 章 → 課次**，每個課次依序是**來源 → 知識 → 產出**。
 
-EduForge 是專為**教育工作者**設計的網站，用 AI 生成並編輯四種教學產物：
+- 來源：使用者的教材（PDF、PPTX、DOCX）。
+- 知識：AI 逐頁讀完來源整理的要點，每個要點都有出處（頁）。沒有出處的要點不得寫入。
+- 產出：教案、學習單、講義、課堂簡報（課次），教學大綱（課程）。一律從知識生成，附出處。
+- 不做：沒有來源的生成、教學影片（先不做）、國高中 108 課綱格式。
 
-| 代號 | 產物 | 說明 |
-|---|---|---|
-| A | 教學文檔 (document) | 教案、學習單、講義 |
-| B | 簡報 (slides) | 課堂簡報 |
-| C | PDF | 由文檔模型渲染出的 PDF |
-| D | 影片 (video) | 簡報 → 講稿 → TTS 配音 → 字幕 → 影片（可含 AI 生成圖片/動畫） |
+目前進度：第 1 期完成（結構、`docread`、知識）。產出的生成器仍是 Paper2Lab 的舊版（`internal/research/generate.go`、`deck.go`、`internal/artifacts`），第 2、3 期重做，**不要在舊生成器上加功能**。
 
-### 必須滿足的產品需求（不可在實作中悄悄放棄）
+## 結構
 
-1. **所有產物皆可線上編輯。**
-2. **框選式 AI 修改**：使用者可在 UI 框選多處文字、點選多個區域，明確告訴 AI「只改這些地方」。
-3. **各產物可獨立選擇生成語言**，預設為網站目前顯示語言；支援 `zh-TW`（繁體中文）與 `en`。
-4. **樣板確認閘門**：正式生成前，必須先產生樣板讓使用者確認，確認後才開始完整生成。
-5. **樣板來源可跨類型**：簡報、PDF、影片、文字皆可作為樣板來源，A/B/C/D 任一產物都能選用。
-6. **風格偏好學習**：首次生成時多向使用者詢問並以範例展示風格；將使用者的回饋與習慣記錄到資料庫，後續生成參考這些記錄（見 §5.9）。
+| 目錄 | 責任 |
+|---|---|
+| `cmd/eduforge` | 服務入口、healthcheck |
+| `internal/domain` | 持久化的契約（Course、Chapter、Lesson、Knowledge、Coverage…）。改了 struct 就執行 `make types` |
+| `internal/store` | SQLite、`records` 表（kind、parent、course_id、lesson_id）、樂觀鎖、檔案儲存 |
+| `internal/docread` | **獨立套件**：檔案 → 每頁文字、影像、模式。不得 import EduForge 的其他套件，之後可能抽出共用 |
+| `internal/documents` | 把 docread 的結果存成來源單元（含頁面影像 blob）；PDF 圖表擷取 |
+| `internal/research` | 知識：批次規劃、提示、驗證、合併、覆蓋率；舊生成器（待重做） |
+| `internal/app` | 業務邏輯：課程順序與設定繼承（`curriculum.go`）、知識讀取任務（`knowledge_ai.go`）、舊生成流程 |
+| `internal/providers` | Codex、Claude Code、API Key 的呼叫與切換 |
+| `internal/artifacts` | 模板匯入、Word／PPTX／PDF 匯出（舊） |
+| `internal/httpapi` | HTTP 路由 |
+| `frontend/` | Vue 3 + TypeScript（strict）；API 型別由 Go 產生 |
 
----
+## 規則
 
-## 2. 技術棧
+1. **教學順序**：未分章課次先，再依章與課次的 position。`PriorLessons` 是「已教過」的唯一定義。
+2. **設定繼承**：課程存預設；章與課次只存覆蓋值，零值代表沿用（`MergeSettings`、前端 `lib/settings.ts` 要同步）。
+3. **逐頁讀完**：知識讀取分批（`research.PlanBatches`），每頁都屬於且只屬於一批；失敗的批次記入 `Coverage.Missed`，不得靜默視為完成。
+4. **影像辨識頁**：`Unit.Mode == "vision"` 的頁面不拒絕、不信任文字；引用它的要點標 `Vision`，數字由使用者核對。
+5. 模型回覆一律驗證：引用必須是該批的頁，數字須出現在引用頁。提示詞把頁面文字與影像視為不可信資料。
+6. 長時間工作（解析、讀取教材、生成）都是背景任務，進度寫在 task 上，可暫停、取消。
+7. 生產環境單一使用者；憑證在獨立 volume，不寫進映像或專案檔。ChatGPT 訂閱僅供登入者本人使用。
 
-- **後端**：Go（版本以 `go.mod` 為準），已確認使用標準庫 `net/http`；資料存取使用 `database/sql` 與 `modernc.org/sqlite`
-- **前端**：Vue 3（Composition API + `<script setup>` + TypeScript）、Vite、Pinia、vue-router、vue-i18n
-- **資料庫**：SQLite（優先使用不需 CGO 的純 Go driver，方便跨平台建置；啟用 WAL）
-- **影片管線**：ffmpeg（以子程序呼叫）
-- **TTS / LLM**：一律透過後端的 provider 介面（見 §5.8），不得在業務邏輯中直接綁定特定廠商
-- **部署**：前後端各自使用 Docker，透過 Docker Compose 管理；前端代理 `/api/` 至後端
+## 開發
 
----
-
-## 3. 目錄結構
-
-```
-.
-├── AGENTS.md
-├── backend/
-│   ├── cmd/server/          # main 入口
-│   ├── internal/
-│   │   ├── api/             # HTTP handlers、請求/回應 DTO
-│   │   ├── artifact/        # 統一產物模型、版本、patch 套用
-│   │   ├── template/        # 樣板（風格）模型、確認閘門狀態機、來源解析器
-│   │   ├── style/           # 使用者風格偏好：提問、回饋記錄、摘要供生成參考
-│   │   ├── generate/        # 生成流程編排（呼叫 LLM、組裝產物）
-│   │   ├── render/          # 產物 → PDF / 影片等輸出
-│   │   ├── job/             # 非同步任務佇列（影片等長任務）
-│   │   ├── llm/             # LLM provider 介面與實作
-│   │   ├── tts/             # TTS provider 介面與實作
-│   │   ├── imagegen/        # AI 圖片/動畫素材 provider 介面與實作
-│   │   ├── store/           # SQLite 存取、migrations
-│   │   └── config/
-│   └── migrations/          # 編號的 SQL migration
-├── frontend/
-│   ├── src/
-│   │   ├── components/      # 共用 UI 元件（AppIcon 等）
-│   │   ├── editors/         # document / slides / pdf / video 各編輯器；共用 AIEditPanel、RevisionPanel、useUndo
-│   │   ├── selection/       # 框選與多區域選取（跨編輯器共用）
-│   │   ├── stores/          # Pinia
-│   │   ├── i18n/            # zh-TW.json、en.json
-│   │   └── views/
-│   └── ...
-├── docs/                    # 設計文件、API 說明
-└── Makefile
+```sh
+scripts/dev.sh make check      # 全部檢查
+scripts/dev.sh go test -race ./internal/docread
 ```
 
-新增目錄或模組前，先確認是否已有合適位置；不要自行建立平行結構。
+主機沒有 Go；工具鏈在 `Dockerfile` 的 `dev` 階段。`docker compose` 預設建置 `runtime` 階段。需要 LibreOffice／Poppler 的測試在工具不存在時會跳過。
 
----
+## 提交
 
-## 4. 常用指令
-
-> 指令透過 Docker Compose 執行，主機不需安裝 Go 或 Node.js。需有可存取的 Docker Engine 與 Compose v2.32 以上；首次建置需網路。啟動與模型連線設定見 `README.md`，文檔 API 與驗收見 `docs/m1.md`；修改簡報模型、樣板、背景生成或選取修改時，先讀 `docs/m4.md`；修改下載、Office／PDF 渲染、匯出字型或容器依賴時，先讀 `docs/downloads.md`。
-
-```bash
-make dev          # 啟動前後端開發容器；Compose Watch 同步修改
-make up           # 建置並啟動正式容器，等待健康檢查通過
-make down         # 停止並移除容器
-make test         # 容器內：後端 go test ./... + 前端 vitest
-make lint         # 容器內：gofmt/go vet + eslint/vue-tsc
-make migrate      # 對正式資料 volume 套用 SQLite migrations
-make build        # 建置正式映像（含後端二進位與前端靜態檔）
-make config       # 檢查正式與開發 Compose 設定
-```
-
-提交前至少要通過 `make lint` 與 `make test`。
-
----
-
-## 5. 核心架構規則（最重要）
-
-### 5.1 統一的產物模型（Artifact Model）
-
-- A/B/C/D 全部以**同一種結構化資料模型**表示：`Artifact` → 有序的 `Block` 清單。
-- **每個 Block 都有穩定、不可重用的 ID**（建立後不變，內容改了 ID 也不變）。
-- 產物的「真實來源」是資料庫中的結構化 JSON，**不是** `.pptx` / `.pdf` / `.mp4` 檔案。這些檔案都是**渲染結果**，可隨時重建。
-- 各類型的 Block 約定：
-  - document：段落、標題、清單、表格、圖片
-  - slides：每張投影片包含多個 Block（標題、文字框、圖片）＋講者備註
-  - pdf：由 document 模型渲染；**PDF 本身不直接編輯位元組**，編輯的是來源文檔模型後重新渲染
-  - video：由 slides 模型衍生，Block 為「每頁講稿 + 字幕 cue + 時間範圍」
-
-### 5.2 框選式 AI 修改（Selection → Patch 流程）
-
-1. 前端把使用者的框選轉成 **Selection**：一組 anchor，每個 anchor 包含 `artifact_id`、`block_id`、（可選）文字 offset 範圍；影片另加時間範圍或字幕 cue ID。
-2. 使用者輸入修改指令，連同 Selection 送到後端。
-3. 後端只把被選取的 Block（加上必要的上下文）交給 LLM，並要求 LLM 回傳**針對這些 block_id 的 patch**。
-4. 後端**驗證 patch 只觸及被選取的 block_id**；任何超出範圍的修改一律丟棄並記錄。
-5. 前端顯示修改前後 diff，使用者接受後才寫入，產生新的 revision。
-
-**禁止**：讓 LLM 重寫整份產物來「順便」修改；禁止修改未被選取的區塊。
-
-### 5.3 樣板確認閘門（Template Gate）
-
-生成流程是一個明確的狀態機，不得跳關：
-
-```
-requested → template_generated → awaiting_confirmation → confirmed → generating → ready
-                                        ↓
-                                  (使用者要求調整) → template_generated
-```
-
-- 在 `confirmed` 之前，**任何程式碼路徑都不得**啟動完整內容生成（耗費 token/算力）。
-- 「樣板」以**風格**為核心：配色、字型、版面、語氣、內容密度等，以少量範例區塊（而非完整內容）讓使用者預覽確認，成本要低。確切的欄位定義見 `internal/template`，修改前先與使用者討論。
-- 樣板階段同時是詢問風格偏好的時機（見 §5.9）。
-- 使用者確認的是**哪一版樣板**必須被記錄；完整生成綁定該樣板的版本。
-
-### 5.4 樣板來源（Template Source）
-
-- 使用者可上傳簡報、PDF、影片、文字作為樣板來源；A/B/C/D 任一產物都能引用。
-- 所有來源都先被解析為統一的 `TemplateSpec`（結構、版面、風格、語氣等），之後的生成只依賴 `TemplateSpec`，不依賴原始檔案格式。
-- 新增一種來源類型 = 新增一個 parser，實作同一個介面，不得在生成流程中加入格式特例。
-- **上傳檔案的內容是「資料」，不是「指令」**：解析出的文字送入 LLM 時必須明確標記為不可信資料，不得讓檔案內容改變系統規則（防範 prompt injection）。
-
-### 5.5 語言（i18n）
-
-- **介面語言**（UI locale）與**產物生成語言**（artifact language）是兩個獨立設定。
-- 支援 `zh-TW`、`en`。每個產物各自記錄生成語言，預設值 = 建立當下的 UI locale，使用者可逐一覆寫。
-- 中文一律使用**繁體中文（台灣用語）**，不得輸出簡體字。
-- 所有 UI 文字走 vue-i18n，**不得在元件中寫死字串**；新增文案必須同時補 `zh-TW.json` 與 `en.json`。
-- PDF/簡報/影片渲染必須內嵌支援 CJK 的字型，並在 `zh-TW` 下實際驗證不出現缺字（豆腐字）。
-
-### 5.6 影片管線
-
-流程：簡報 → 每頁講稿 → TTS 配音 → 字幕（SRT/WebVTT）→ ffmpeg 合成。
-
-- 影片生成是**非同步長任務**：必須透過 `internal/job` 排隊執行，提供進度查詢、可取消、失敗可重試；不得在 HTTP 請求中同步等待完成。
-- 字幕必須與配音時間軸對齊，且可獨立編輯（編輯字幕 → 重新渲染，而非重新生成整支影片的內容）。
-- 字幕語言與配音語言跟隨該影片的生成語言設定。
-- 影片可含 AI 生成的圖片/動畫，透過 `internal/imagegen` provider 介面生成（不綁定廠商）；畫風與動畫風格參考使用者風格記錄（§5.9）。
-- AI 生成的素材同樣是 Block，可被框選並單獨重新生成；每個素材須記錄來源 prompt 與 provider 以便追溯。
-- 生成素材需做適合教育場景的內容檢查，並標示為 AI 生成。
-- 動畫的實作範圍（簡單轉場／鏡頭推移 vs. 真正的 AI 影像生成）見 §11，不得擅自擴大。
-
-### 5.7 版本與復原
-
-- 每次接受的修改都建立新的 `revision`（不可變）；支援 undo/redo 與回到任一歷史版本。
-- 絕不原地覆寫舊 revision。
-
-### 5.8 外部服務（LLM / TTS）
-
-- 所有 LLM、TTS 呼叫經由 `internal/llm`、`internal/tts` 的介面；業務邏輯不得 import 特定廠商 SDK。
-- **模型連線設定**（依使用者要求調整）：API 金鑰可由前端密碼欄位輸入並送至同源後端，送出與離開頁面時清空。後端從環境變數或本次執行的記憶體取得金鑰；不得寫入瀏覽器儲存、資料庫、日誌、版本控制或回應內容。ChatGPT 訂閱一律透過 Codex CLI（`codex app-server`）使用：登入憑證由 Codex 保存在 `CODEX_HOME`，EduForge 不得讀取、複製或儲存其中的權杖；啟動 Codex 時只傳必要環境變數，不得傳入 API 金鑰。
-- 設定每位使用者的生成次數/長度上限，避免失控成本；超限回傳明確的錯誤碼。
-- LLM 回傳需要結構化輸出時，必須做 schema 驗證，驗證失敗要重試或回報，不得直接信任。
-
-### 5.9 風格偏好學習（Style Profile）
-
-目標：**第一次多問，之後少問**——把使用者的風格與習慣記進資料庫，讓後續生成直接參考。
-
-- **首次引導**：當使用者尚無某產物類型（A/B/C/D）的風格記錄時，在樣板階段（§5.3）多問幾題，並以**視覺化範例展示**（例如 2–3 組配色/字型/版面/語氣的小預覽）讓使用者選，而不只是文字問卷。題數要有上限、可跳過、可稍後再補。
-- **記錄什麼**：
-  - 明確回饋：選了哪個風格、拒絕了哪個、使用者直接說出的偏好
-  - 行為回饋：樣板確認或退回、接受或拒絕 AI patch、手動修改的傾向（例如常把語氣改得更口語）
-  - 每筆記錄標示來源（`explicit` / `observed`）、適用範圍（全域或特定產物類型）、時間
-- **推論要保守**：行為回饋需累積足夠次數才升格為偏好；單次行為不得形成永久規則；偏好可隨時間衰減，也可被新回饋覆寫。
-- **使用方式**：後續生成時，把風格記錄的摘要注入樣板生成與內容生成。**優先順序**：使用者當次明確指示 > 當次選用的樣板／樣板來源 > 已記錄的風格偏好 > 系統預設。
-- **使用者可控**：提供介面讓使用者查看、編輯、刪除單筆記錄，或整份重設；刪除後 AI 不得再引用。
-- **隱私**：風格記錄是使用者的個人資料，只供該使用者使用；**只記風格層級的特徵**（配色、字型、版面、語氣、內容密度、字數偏好等），不得記入學生個資或文件實際內容。
-- 實作位置 `internal/style/`；資料表見 §6。
-
----
-
-## 6. 資料庫（SQLite）
-
-- Schema 變更**只能**透過 `backend/migrations/` 中新增編號 migration；不得手動改現有 migration。
-- 啟用 WAL 與 `foreign_keys=ON`。
-- 產物內容以 JSON 欄位儲存，但 Block ID、artifact_id、revision 等需索引的欄位要獨立成欄。
-- 上傳檔案存放於檔案系統（路徑記錄在資料庫），不要把大型二進位塞進 SQLite。
-- 測試使用暫存的 in-memory 或臨時檔案資料庫，不得觸碰開發用資料庫。
-- 風格記錄使用 `style_profiles`（彙整後的偏好）與 `style_feedback_events`（原始回饋事件）兩張表。
-- 目前為單一使用者（固定的預設使用者），但**所有使用者資料表都必須帶 `user_id`**，不得省略，以便日後擴充多使用者。
-
----
-
-## 7. API 規範
-
-- REST + JSON，路徑前綴 `/api/v1`。
-- 錯誤回應格式統一：`{"error": {"code": "...", "message": "..."}}`，`code` 為穩定的機器可讀字串。
-- 長任務以 `POST` 建立 job，回傳 `job_id`；用 `GET /jobs/{id}` 查進度。
-- 對外 DTO 與資料庫模型分離，不要直接把資料庫結構體序列化給前端。
-
----
-
-## 8. 程式碼風格
-
-**Go**
-- `gofmt`、`go vet` 必須通過；錯誤要處理並以 `%w` 包裝，不得吞掉。
-- 以 `context.Context` 作為第一個參數傳遞取消/逾時，尤其是 LLM、TTS、ffmpeg 呼叫。
-- 子程序（ffmpeg）呼叫要設逾時，且**不得**把使用者輸入直接拼進 shell 字串；用參數陣列傳入。
-
-**Vue / TypeScript**
-- 僅使用 Composition API 與 `<script setup lang="ts">`；啟用 TypeScript strict。
-- 狀態共用放 Pinia，元件內部狀態放本地。
-- 編輯器元件必須透過 `selection/` 模組提供框選，**不得**各自實作一套。
-- 介面設計以 Paper2Lab 為基準：沿用 `style.css` 的色彩 token、按鈕與面板樣式，新編輯器使用共用的 AIEditPanel、RevisionPanel、useUndo。
-
-**通用**
-- 識別字用英文；程式碼註解與 commit 訊息用繁體中文或英文皆可，同一檔案內保持一致。
-- 不要為了「順便」重構與任務無關的程式碼。
-
----
-
-## 9. 測試
-
-- 後端：核心邏輯（patch 範圍驗證、樣板狀態機、樣板來源 parser）必須有單元測試。
-- **必測的不變條件**：
-  - patch 觸及未選取 Block 時被拒絕
-  - 未 `confirmed` 的樣板無法啟動完整生成
-  - 不同生成語言下輸出符合選定語言
-  - 舊 revision 在修改後仍可讀取且內容不變
-  - 使用者刪除的風格記錄不會再被注入後續生成
-  - 風格優先順序：當次明確指示 > 樣板 > 風格記錄 > 預設
-  - 單次行為回饋不會形成永久偏好
-- 前端：框選與多區域選取、語言切換需有元件測試。
-- LLM/TTS 在測試中一律用 mock provider，**測試不得呼叫真實外部服務**。
-
----
-
-## 10. 安全與教育場景注意事項
-
-- 上傳檔案：限制類型、大小，檢查實際內容而非只看副檔名；解析在受限環境中進行。
-- 不蒐集、不儲存學生個資；若使用者貼入含個資的內容，不得記錄到日誌。
-- AI 生成內容需能被標示為「AI 生成」，並提醒教師在使用前自行審閱正確性。
-- 使用者上傳的樣板可能有版權；僅用於該使用者自己的生成，不得跨使用者共享或用於訓練。
-
----
-
-## 11. 待決策事項（AI 不得擅自決定，需先詢問使用者）
-
-- HTTP 路由器已確認為 `net/http`，資料存取已確認為 `database/sql`＋純 Go `modernc.org/sqlite`
-- 簡報已確認採用自建 Block 編輯器：縮圖導覽、標題／文字／圖片、講者備註、多區域選取與播放。樣板沿用配色、字型、語氣、內容密度，版面為 `title_body`／`two_columns`／`image_text`，確認前僅生成一頁少量範例。
-- PDF 匯出已確認參考 Paper2Lab：以 LibreOffice 無頭模式將同一份 DOCX／PPTX 轉為 PDF，使用獨立暫存目錄與 profile、context 逾時；這不代表 M5 獨立 PDF 產物流程已完成。
-- LLM 已確認支援經由 Codex CLI 的 ChatGPT 訂閱方案與前端輸入 API key 的相容 API 連線；TTS、圖片/動畫生成的實際供應商仍待決策
-- 影片動畫的實作範圍（簡單轉場／鏡頭推移 vs. 真正的 AI 影像生成）
-- 行為回饋升格為偏好的門檻與衰減方式
-- 使用者帳號與認證機制（目前決定：**先做單一使用者**、不做登入；資料表保留 `user_id`；多使用者前需先設計）
-- 部署方式已確認：前後端皆使用 Docker；外部主機、網域與 TLS 配置於對外部署前另行確認
-
-遇到上述議題時：先列出選項與取捨，等使用者決定，再動手。
-
----
-
-## 12. 開發階段（由小到大，一次只做一個）
-
-依使用者當次要求，先實作 M4 課堂簡報及其必要的 Selection → Patch 流程。M2 風格偏好學習、文檔的完整 M3 介面與 M7 樣板來源仍按後續任務實作。
-
-| 階段 | 目標 | 完成標準 |
-|---|---|---|
-| M0 | **可顯示的網頁骨架** | Vue 首頁可開啟；Go `/api/v1/health` 可用；`zh-TW`/`en` 介面可切換 |
-| M1 | 文檔 (A)：統一模型 + 線上編輯 + 樣板閘門 | 完整走完 §5.3 流程 |
-| M2 | 風格偏好學習 | 首次風格提問與範例展示、回饋記錄、後續生成參考，使用者可查看/刪除 |
-| M3 | 框選式 AI 修改 | 完整走完 §5.2 流程，含 diff 與 revision |
-| M4 | 簡報 (B) | 同上，含樣板確認 |
-| M5 | PDF (C) | 由文檔渲染，CJK 字型正確 |
-| M6 | 影片 (D) | 非同步任務 + 字幕可編輯 + AI 素材可單獨重生 |
-| M7 | 樣板來源（簡報/PDF/影片/文字） | 各 parser 產出統一 `TemplateSpec` |
-
----
-
-## 13. 給 AI 的工作守則
-
-1. **動手前先讀相關程式碼**，確認既有慣例，不要假設。
-2. **小步修改**：一次完成一件事，改動範圍符合任務，避免大範圍重寫。
-3. **遇到本文件未涵蓋或衝突的情況，先問，不要猜。**
-4. 完成後說明：改了什麼、怎麼驗證的、還有哪些風險或未完成項目。
-5. 不得為了讓測試通過而刪除或弱化測試。
-6. 不得提交金鑰、個資或大型生成檔案。
-7. 不得違反 §5 的核心規則；如認為規則需要調整，請提出建議並等使用者同意後再修改本文件。
-
-### 完成定義（Definition of Done）
-
-- [ ] 功能符合 §1 的相關需求
-- [ ] `make lint` 與 `make test` 通過
-- [ ] 新增的 UI 文案已補齊 `zh-TW` 與 `en`
-- [ ] §5 的不變條件有對應測試
-- [ ] 若影響架構或指令，已同步更新本文件
+每個完成並驗證的步驟 commit 一次，在功能分支上；使用者說合併才合併，不主動 push。

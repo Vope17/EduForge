@@ -25,8 +25,8 @@ test('reordering slides does not mutate the previous version', () => {
   assert.deepEqual(move(previous, 2, 1), previous)
 })
 test('important platform errors are localized, with the source error code retained for unknown errors', () => {
-  assert.match(errorText('confirm_knowledge_first', 'en'), /shared knowledge/)
-  assert.match(errorText('confirm_knowledge_first', 'zh-TW'), /共同知識/)
+  assert.match(errorText('confirm_knowledge_first', 'en'), /lesson’s knowledge/)
+  assert.match(errorText('confirm_knowledge_first', 'zh-TW'), /課次的知識/)
   assert.match(errorText('new_error_code', 'zh-TW'), /操作未完成.*new_error_code/)
 })
 test('model markdown markers are removed for previews', async () => {

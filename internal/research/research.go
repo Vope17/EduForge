@@ -91,8 +91,14 @@ func Extract(title string, sources []domain.Record) domain.Knowledge {
 			}
 		}
 		if count == 0 && len(k.Units) > 0 {
-			u := k.Units[min(i, len(k.Units)-1)]
-			k.Claims = append(k.Claims, domain.Claim{Section: i, Text: Clip(u.Text, 900), Citations: []string{u.ID}, Kind: "source_excerpt"})
+			// Fall back to a page that has text; pages without any (scans) wait for a model.
+			for offset := 0; offset < len(k.Units); offset++ {
+				u := k.Units[(i+offset)%len(k.Units)]
+				if strings.TrimSpace(u.Text) != "" {
+					k.Claims = append(k.Claims, domain.Claim{Section: i, Text: Clip(u.Text, 900), Citations: []string{u.ID}, Kind: "source_excerpt"})
+					break
+				}
+			}
 		}
 	}
 	k.Terms = ExtractTerms(k.Units, title)
