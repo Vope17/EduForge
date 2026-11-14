@@ -132,7 +132,7 @@ func TestSelectedBranchLanguageAndTaskCheckpoint(t *testing.T) {
 		t.Fatalf("wrong output: %#v", art)
 	}
 	steps, _ := a.Store.List(ctx, owner, store.Filter{Kind: "step", Parent: tasks[0].ID})
-	if len(steps) != 6 {
+	if len(steps) != 7 {
 		t.Fatal("subtask checkpoints missing")
 	}
 	if err = a.process(ctx, owner, tasks[0].ID); err != nil {

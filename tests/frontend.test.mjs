@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { t, labels, errorText, outputLanguage, move, parseCommands } from '../frontend/src/lib/i18n.ts'
+import { t, labels, errorText, outputLanguage, move } from '../frontend/src/lib/i18n.ts'
 
 test('all registered UI labels have distinct nonempty English and Traditional Chinese values', () => {
   assert.ok(Object.keys(labels).length > 150)
@@ -23,11 +23,6 @@ test('reordering slides does not mutate the previous version', () => {
   assert.deepEqual(previous, ['question', 'method', 'results'])
   assert.deepEqual(move(previous, 0, -1), previous)
   assert.deepEqual(move(previous, 2, 1), previous)
-})
-test('commands preserve arguments, quotes, paths and numeric text without an implicit shell', () => {
-  const text = ' ["node", "a b/experiment.mjs", "--seed", "42"]\n\n["printf", "$(touch secret)"]'
-  assert.deepEqual(parseCommands(text), [['node', 'a b/experiment.mjs', '--seed', '42'], ['printf', '$(touch secret)']])
-  for (const invalid of ['node experiment.mjs', '[]', '[42]', '"ls"']) assert.throws(() => parseCommands(invalid))
 })
 test('important platform errors are localized, with the source error code retained for unknown errors', () => {
   assert.match(errorText('confirm_knowledge_first', 'en'), /shared knowledge/)
@@ -117,4 +112,41 @@ test('formulas in reader text become chips the editor renders, and prices stay t
   assert.match(html, /<span class="math-chip" contenteditable="false" data-tex="a&lt;b">\$a&lt;b\$<\/span>/)
   assert.match(html, /<div class="math-block" contenteditable="false" data-tex="x\^2" data-display="1">/)
   assert.match(html, /<li><b>重點<\/b> <span class="math-chip"[^>]*data-tex="y"/)
+})
+
+test('teaching order lists unfiled lessons first, then chapters, each by position', async () => {
+  const { chapterList, groupLessons, orderedLessons, orderOf, moveLessonTo, moveLessonBy, moveChapterBy } = await import('../frontend/src/lib/library.ts')
+  const chapter = (id, position) => ({ id, data: { name: id, position, settings: {} } })
+  const lesson = (id, position, chapterID = '') => ({ id, data: { title: id, position, chapter: chapterID, settings: {} } })
+  const chapters = chapterList({ chapter: [chapter('two', 1), chapter('one', 0)] })
+  assert.deepEqual(chapters.map(c => c.id), ['one', 'two'])
+  const lessons = [lesson('b', 1, 'one'), lesson('a', 0, 'one'), lesson('x', 0, 'two'), lesson('free', 0), lesson('gone', 0, 'deleted-chapter')]
+  assert.deepEqual(orderedLessons(lessons, chapters).map(l => l.id), ['free', 'gone', 'a', 'b', 'x'])
+  const groups = groupLessons(lessons, chapters)
+  assert.equal(groups[0].key, '')
+  const order = orderOf(groups)
+  assert.deepEqual(order.chapters, ['one', 'two'])
+  // Dropping before a lesson, onto the end of a chapter, and keyboard moves.
+  assert.deepEqual(moveLessonTo(order, 'x', 'one', 'a').groups.find(g => g.chapter === 'one').lessons, ['x', 'a', 'b'])
+  assert.deepEqual(moveLessonTo(order, 'free', 'two').groups.find(g => g.chapter === 'two').lessons, ['x', 'free'])
+  assert.deepEqual(moveLessonTo(order, 'a', '').groups.find(g => g.chapter === '').lessons, ['free', 'gone', 'a'])
+  assert.deepEqual(moveLessonBy(order, 'a', 1).groups.find(g => g.chapter === 'one').lessons, ['b', 'a'])
+  assert.deepEqual(moveLessonBy(order, 'b', 1).groups.find(g => g.chapter === 'two').lessons, ['b', 'x'], 'the last lesson of a chapter joins the next chapter')
+  assert.deepEqual(moveLessonBy(order, 'x', -1).groups.find(g => g.chapter === 'one').lessons, ['a', 'b', 'x'], 'the first lesson of a chapter joins the previous one')
+  assert.equal(moveLessonBy(order, 'free', -1), order, 'the first lesson cannot move earlier')
+  assert.deepEqual(moveChapterBy(order, 'one', 1).chapters, ['two', 'one'])
+  assert.equal(moveChapterBy(order, 'one', -1), order)
+  assert.deepEqual(order.groups.find(g => g.chapter === 'one').lessons, ['a', 'b'], 'moves do not change the original order')
+})
+test('settings inherit course, then chapter, then lesson; empty fields never blank a value', async () => {
+  const { effectiveSettings } = await import('../frontend/src/lib/settings.ts')
+  const course = { audience: 'undergraduates', minutes: 90, level: 'advanced', depth: 'deep', instructions: { A: 'plain' } }
+  assert.deepEqual(effectiveSettings(undefined), { depth: 'standard', level: 'intermediate', minutes: 50, languages: {}, instructions: {} })
+  const merged = effectiveSettings(course, { minutes: 30, audience: '' }, { audience: 'graduate students', instructions: { A: '' , B: 'brief' } })
+  assert.equal(merged.audience, 'graduate students')
+  assert.equal(merged.minutes, 30)
+  assert.equal(merged.level, 'advanced')
+  assert.equal(merged.depth, 'deep')
+  assert.deepEqual(merged.instructions, { A: 'plain', B: 'brief' })
+  assert.equal(effectiveSettings(course, {}, {}).minutes, 90)
 })

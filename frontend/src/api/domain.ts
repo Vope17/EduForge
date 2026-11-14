@@ -137,6 +137,17 @@ export interface Claim {
    * passages do not contain.
    */
   unsupported?: string[]
+  /**
+   * Detail is the part of a point that goes with its statement: the
+   * solution of a worked example, the correction of a misconception, the
+   * symbols of a formula.
+   */
+  detail?: string
+  /**
+   * Vision marks a point that cites a page the model read from its image
+   * (a scan or a picture-only slide), so the user checks it against the page.
+   */
+  vision?: boolean
 }
 
 export interface Term {
@@ -150,14 +161,6 @@ export interface Term {
   deprecated?: string[]
 }
 
-export interface Conditions {
-  task: string
-  dataset: string
-  split: string
-  metric: string
-  evaluation: string
-}
-
 export interface Knowledge {
   title: string
   claims: Claim[] | null
@@ -165,7 +168,6 @@ export interface Knowledge {
   units: Unit[] | null
   images: Image[] | null
   issues: Issue[] | null
-  conditions: Conditions
   confirmed: boolean
   edits: number
   /**
@@ -176,6 +178,27 @@ export interface Knowledge {
   author?: string
   language?: string
   ai_error?: string
+  /**
+   * Coverage says how much of the sources a model read when it wrote this
+   * knowledge. Nil for rule-based excerpts and for knowledge a person wrote.
+   */
+  coverage?: Coverage
+}
+
+/**
+ * Coverage records how completely a model read the source pages: every page
+ * is read in batches, and a batch that failed leaves its pages in Missed.
+ */
+export interface Coverage {
+  /** pages in the sources */
+  pages: number
+  /** pages a model read */
+  read: number
+  /** of those, read from the page image */
+  vision: number
+  /** model calls made */
+  batches: number
+  missed?: string[]
 }
 
 /** Style deliberately excludes language, facts, commands, metrics and permissions. */
@@ -276,6 +299,11 @@ export interface Task {
   result_id?: string
   completed: number
   total: number
+  /**
+   * MissedOnly makes a knowledge task read only the pages a previous read
+   * missed, and add to the existing knowledge.
+   */
+  missed_only?: boolean
 }
 
 export interface Step {

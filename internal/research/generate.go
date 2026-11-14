@@ -15,12 +15,14 @@ import (
 // passages behind them (in page order) and images of those pages, so the
 // model reads equations, tables and figures as printed.
 
-// RelatedSection is the lesson's own related work.
-const RelatedSection = 6
+// RelatedSection is no longer a special section (it was the paper's related
+// work); -1 matches none.
+const RelatedSection = -1
 
-// SectionOrder is the order sections appear in readers and decks: related
-// work follows the motivation, as in most lessons.
-var SectionOrder = []int{0, RelatedSection, 1, 2, 3, 4, 5}
+// SectionOrder is the order sections appear in readers and decks. The
+// reader and deck writers are reworked for teaching output in the next phase;
+// until then they follow the knowledge sections in order.
+var SectionOrder = []int{0, 1, 2, 3, 4, 5, 6}
 
 // Budget sizes the evidence for one section and, for readers, its length.
 type Budget struct {
@@ -49,7 +51,7 @@ func BudgetFor(kind, depth string) Budget {
 
 // slideWeights share a talk's slides among the sections; the method and the
 // results take the most.
-var slideWeights = map[int]float64{0: 1, RelatedSection: 0.6, 1: 1, 2: 2.2, 3: 1, 4: 1.6, 5: 0.6}
+var slideWeights = map[int]float64{0: 1, 1: 0.6, 2: 2.2, 3: 1.6, 4: 1.6, 5: 0.6, 6: 0.6}
 
 // SlideCounts splits a talk of minutes into content slides per section,
 // about 1.1 slides a minute (figures may add slides of their own).

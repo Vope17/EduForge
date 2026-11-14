@@ -13,6 +13,7 @@ const parseTasks = computed(() => (state.snapshot.task || []).filter(x => x.less
 const parsing = computed(() => parseTasks.value.some(x => ACTIVE.includes(x.data.status)))
 const lastParse = computed(() => parseTasks.value[0])
 
+const visionCount = (source: (typeof sources.value)[number]) => (source.data.parsed?.units || []).filter(u => u.mode === 'vision').length
 function pick(list: FileList | null | undefined) { files.value = Array.from(list || []) }
 function drop(event: DragEvent) { dragging.value = false; pick(event.dataTransfer?.files) }
 async function upload() {
@@ -64,6 +65,7 @@ async function parse() { await act(() => api(`/lessons/${state.lessonID}/parse`,
           <p v-if="source.data.error" class="issue-text">{{ explain(source.data.error) }}</p>
         </div>
         <span class="pill" :class="{ success: source.data.parsed }">{{ source.data.parsed ? `${(source.data.parsed.units || []).length} ${t('units')}` : t('pending') }}</span>
+        <span v-if="visionCount(source) > 0" class="pill vision" :title="t('visionHint')">{{ visionCount(source) }} {{ t('visionPage') }}</span>
         <a class="text-button" :href="fileURL(source, source.data.path)" target="_blank" rel="noopener" :aria-label="t('openFile')">↗</a>
       </div>
       <p v-if="!sources.length" class="empty-inline">{{ t('stepNeedsSource') }}</p>

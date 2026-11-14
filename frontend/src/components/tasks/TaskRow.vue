@@ -5,7 +5,7 @@ import type { Rec, Task } from '../../api/types.ts'
 const props = defineProps<{ task: Rec<Task>; compact?: boolean }>()
 const { state, t, api, act, explain, openLesson } = useWorkspace()
 const d = computed(() => props.task.data)
-const label = computed(() => d.value.type === 'parse' ? t('parseType')
+const label = computed(() => d.value.type === 'parse' ? t('parseType') : d.value.type === 'knowledge' ? t('knowledgeType')
   : d.value.type.startsWith('preview:') ? t('previews') + ' · ' + d.value.type.slice(8) : t(d.value.type))
 const lesson = computed(() => (state.snapshot.lesson || []).find(x => x.id === props.task.lesson_id))
 const tone = computed(() => d.value.status === 'completed' ? 'success' : ['failed', 'paused'].includes(d.value.status) ? 'warning' : '')
@@ -22,7 +22,7 @@ async function control(action: string) { await act(() => api(`/tasks/${props.tas
         · {{ d.language || '—' }} · {{ task.id.slice(0, 8) }}
       </p>
       <progress :value="d.completed" :max="d.total || 1"></progress>
-      <p v-if="d.type === 'parse' && d.stage === 'knowledge' && d.status === 'running'" class="caption">{{ t('stageKnowledge') }}</p>
+      <p v-if="['parse', 'knowledge'].includes(d.type) && d.stage === 'knowledge' && d.status === 'running'" class="caption">{{ t('stageKnowledge') }}</p>
       <p v-if="d.error" class="issue-text">{{ explain(d.error) }}</p>
     </div>
     <span class="pill" :class="tone">{{ t(d.status) }} · {{ d.completed }}/{{ d.total }}</span>

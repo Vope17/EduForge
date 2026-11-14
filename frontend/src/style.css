@@ -1128,3 +1128,29 @@ button.citation.on { background: var(--brand); color: #fff }
 .slide-formula-svg { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center }
 .slide-formula-svg svg { max-width: 100%; max-height: 100% }
 .slide-formula code { font-size: 12px; white-space: pre-wrap }
+
+/* Course structure: defaults, chapters, teaching order */
+.course-settings { margin-bottom: 16px }
+.course-settings > .chapter-toggle { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer }
+.course-settings > .chapter-toggle .caption { margin-left: auto }
+.settings-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; align-items: end; margin-top: 12px }
+.settings-fields label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-2) }
+.order-hint { margin: 0 0 10px }
+.chapter-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px }
+.chapter-head .chapter-heading { margin: 0 }
+.chapter-tools { gap: 4px; align-items: center }
+.chapter-settings { margin-bottom: 14px }
+.lesson-chapter.drop-target { outline: 2px dashed var(--brand-ring); outline-offset: 6px; border-radius: var(--radius, 12px) }
+.lesson-card[draggable="true"] { cursor: grab }
+.lesson-card.dragging { opacity: .45 }
+.lesson-card.drop-before { box-shadow: -4px 0 0 var(--brand), var(--shadow) }
+.lesson-card-top .button-row { gap: 2px }
+.lesson-settings { margin-bottom: 14px }
+.lesson-settings > summary { cursor: pointer; font-weight: 600 }
+
+/* Knowledge: coverage, vision pages, details */
+.knowledge-coverage { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; margin: 0 0 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); font-size: 13px }
+.knowledge-coverage.incomplete { border-color: var(--warn-line); background: var(--warn-soft) }
+.pill.vision { color: #6b3fa0; background: #f1eafa; border-color: #d9c8ee }
+.knowledge-detail { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 0; font-size: 13px; color: var(--ink-2) }
+.knowledge-detail textarea { width: 100% }

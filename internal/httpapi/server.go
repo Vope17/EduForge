@@ -286,12 +286,13 @@ func (s *Server) routes() {
 	})
 	s.handle("POST /api/lessons/{id}/knowledge/ai", func(w http.ResponseWriter, r *http.Request) error {
 		var input struct {
-			Version int `json:"version"`
+			Version    int  `json:"version"`
+			MissedOnly bool `json:"missed_only"`
 		}
 		if err := decode(r, w, &input); err != nil {
 			return err
 		}
-		out, err := s.App.RewriteKnowledge(r.Context(), owner(r), r.PathValue("id"), input.Version)
+		out, err := s.App.QueueKnowledge(r.Context(), owner(r), r.PathValue("id"), input.Version, input.MissedOnly)
 		respond(w, out, err)
 		return nil
 	})

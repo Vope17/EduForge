@@ -7,6 +7,8 @@ import Icon from '../Icon.vue'
 import StepSources from '../lesson/StepSources.vue'
 import StepOutputs from '../lesson/StepOutputs.vue'
 import KnowledgePanel from '../KnowledgePanel.vue'
+import SettingsFields from '../settings/SettingsFields.vue'
+import { effectiveSettings, type SettingsOverride } from '../../lib/settings.ts'
 import type { IconName } from '../../lib/icons.ts'
 import type { Step } from '../../lib/router.ts'
 
@@ -23,6 +25,16 @@ const fixStep = computed(() => {
   const target = nextStep(steps.value)
   return target !== current.value?.key ? target : ''
 })
+// This lesson's own settings, over its chapter's and the course's.
+const inherited = computed(() => {
+  const chapter = chapters.value.find(c => c.id === lesson.value?.data.chapter)
+  return effectiveSettings(state.snapshot.course?.data.settings, chapter?.data.settings)
+})
+async function saveSettings(value: SettingsOverride) {
+  const l = lesson.value
+  if (!l) return
+  await act(() => api(`/lessons/${l.id}`, { method: 'PUT', body: { version: l.version, lesson: { ...l.data, settings: { ...l.data.settings, ...value } } } }))
+}
 async function removeLesson() {
   if (!lesson.value) return
   const { id, data } = lesson.value
@@ -48,6 +60,12 @@ async function removeLesson() {
       </div>
       <button class="text-button danger" @click="removeLesson">{{ t('deleteLesson') }}</button>
     </div>
+
+    <details class="panel lesson-settings">
+      <summary>{{ t('lessonSettings') }}</summary>
+      <p class="caption">{{ t('courseSettingsHint') }}</p>
+      <SettingsFields mode="override" :model-value="lesson.data.settings" :inherited="inherited" :busy="!!state.busy" @save="saveSettings" />
+    </details>
 
     <ol class="stepper" role="tablist">
       <li v-for="(step, i) in steps" :key="step.key" :class="[step.state, { current: step.key === route.step }]">

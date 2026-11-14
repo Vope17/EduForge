@@ -9,11 +9,34 @@ import (
 	"eduforge/internal/domain"
 )
 
+// The sections of a lesson's knowledge, by index. They are what a teacher
+// plans a class from.
+const (
+	SecObjectives = iota
+	SecPrerequisites
+	SecConcepts
+	SecFormulas
+	SecExamples
+	SecMisconceptions
+	SecFigures
+)
+
+// Sections is how many knowledge sections there are.
+const Sections = 7
+
 var Titles = map[string][]string{
-	"en":    {"Motivation & research question", "Core concepts & contributions", "Method & equations", "Experimental design", "Results", "Limitations", "Related work"},
-	"zh-TW": {"研究動機與問題", "核心概念與貢獻", "方法與公式", "實驗設計", "研究結果", "限制與待確認事項", "相關研究"},
+	"en":    {"Learning objectives", "Prerequisites", "Core concepts & definitions", "Formulas & rules", "Worked examples & exercises", "Common misconceptions", "Figures & tables"},
+	"zh-TW": {"學習目標", "先備知識", "核心概念與定義", "公式與規則", "例題與解答", "常見迷思", "圖表"},
 }
-var sectionPatterns = []*regexp.Regexp{regexp.MustCompile(`(?i)intro|motivat|problem|動機|研究問題`), regexp.MustCompile(`(?i)abstract|contribut|concept|摘要|貢獻`), regexp.MustCompile(`(?i)method|algorithm|equation|方法|模型`), regexp.MustCompile(`(?i)experiment|dataset|evaluation|實驗|資料集`), regexp.MustCompile(`(?i)result|accuracy|結果`), regexp.MustCompile(`(?i)limit|conclu|future|限制|結論`), regexp.MustCompile(`(?i)related work|prior work|previous work|background|相關研究|相關工作|背景`)}
+var sectionPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)objective|learning outcome|goal|you will be able|學習目標|學習成果|教學目標`),
+	regexp.MustCompile(`(?i)prerequisite|prior knowledge|assumed|background|先備|預備知識|前置`),
+	regexp.MustCompile(`(?i)definition|define[sd]?\b|is called|concept|稱為|定義|概念`),
+	regexp.MustCompile(`(?i)theorem|formula|equation|law of|rule|公式|定理|定律|法則`),
+	regexp.MustCompile(`(?i)example|exercise|problem|solution|answer|例題|習題|範例|解答`),
+	regexp.MustCompile(`(?i)misconception|common mistake|pitfall|caution|note that|迷思|常見錯誤|注意`),
+	regexp.MustCompile(`(?i)\bfig(?:ure)?\.?\s*\d|\btable\s*\d|圖\s*\d|表\s*\d`),
+}
 
 func Clip(text string, n int) string {
 	r := []rune(text)

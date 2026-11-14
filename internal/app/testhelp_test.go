@@ -32,3 +32,14 @@ func useFakeModel(t *testing.T, a *App, owner string, reply func(prompt string) 
 	}
 	return prompts
 }
+
+func mustGet(t *testing.T, a *App, owner, id string) domain.Record {
+	t.Helper()
+	r, err := a.Store.Get(context.Background(), owner, id, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+func storeFilter(kind, lesson string) store.Filter { return store.Filter{Kind: kind, Lesson: lesson} }

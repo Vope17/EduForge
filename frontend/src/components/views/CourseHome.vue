@@ -2,18 +2,23 @@
 import { computed, ref } from 'vue'
 import { useWorkspace } from '../../lib/workspace.ts'
 import { lessonSteps, nextStep } from '../../lib/status.ts'
-import { chapterList, groupLessons, libraryActions } from '../../lib/library.ts'
+import { chapterList, groupLessons, libraryActions, moveChapterBy, moveLessonBy, moveLessonTo, orderOf } from '../../lib/library.ts'
+import { effectiveSettings, type SettingsOverride } from '../../lib/settings.ts'
+import SettingsFields from '../settings/SettingsFields.vue'
 import Icon from '../Icon.vue'
 import StepDots from '../lesson/StepDots.vue'
 import NewLessonDialog from '../dialogs/NewLessonDialog.vue'
 import NewCourseDialog from '../dialogs/NewCourseDialog.vue'
-import type { Lesson, Rec } from '../../api/types.ts'
+import type { Chapter, Lesson, Rec } from '../../api/types.ts'
 
 const workspace = useWorkspace()
-const { state, t, go, openLesson } = workspace
-const { createChapter, moveLesson, deleteCourse } = libraryActions(workspace)
+const { state, t, api, act, go, openLesson } = workspace
+const { createChapter, renameChapter, deleteChapter, moveLesson, reorder, deleteCourse } = libraryActions(workspace)
 const chapters = computed(() => chapterList(state.snapshot))
-const groups = computed(() => groupLessons(lessons.value, chapters.value).filter(g => g.chapter || g.lessons.length))
+// The unfiled group is shown only when it has lessons; empty chapters stay.
+const allGroups = computed(() => groupLessons(lessons.value, chapters.value))
+const groups = computed(() => allGroups.value.filter(g => g.chapter || g.lessons.length))
+const order = computed(() => orderOf(allGroups.value))
 const addingLesson = ref(false), addingCourse = ref(false), personal = ref(false)
 const lessons = computed(() => state.snapshot.lesson || [])
 const anyParsed = computed(() => lessons.value.some(p => p.data.knowledge_id))
@@ -24,6 +29,38 @@ const onboarding = computed(() => [
   { key: 'parse', done: anyParsed.value, label: t('onboardParse'), action: () => lessons.value[0] && openLesson(lessons.value[0].id, 'sources') },
 ])
 const showOnboarding = computed(() => onboarding.value.some(step => !step.done))
+// Course defaults and chapter overrides.
+const course = computed(() => state.snapshot.course)
+const settingsOpen = ref(false), chapterSettings = ref('')
+async function saveCourseSettings(value: SettingsOverride) {
+  const c = course.value
+  if (!c) return
+  await act(() => api(`/courses/${c.id}`, { method: 'PUT', body: { version: c.version, name: c.data.name, description: c.data.description, settings: { ...c.data.settings, ...value } } }))
+}
+async function saveChapterSettings(chapter: Rec<Chapter>, value: SettingsOverride) {
+  await act(() => api(`/chapters/${chapter.id}`, { method: 'PUT', body: { name: chapter.data.name, settings: { ...chapter.data.settings, ...value } } }))
+  chapterSettings.value = ''
+}
+const courseDefaults = computed(() => effectiveSettings(course.value?.data.settings))
+const inheritedForChapter = computed(() => courseDefaults.value)
+
+// Teaching order: drag a lesson onto another lesson (it goes before it) or onto
+// a chapter (it goes last); the arrows do the same for the keyboard.
+const dragging = ref(''), over = ref('')
+function onDragStart(event: DragEvent, id: string) {
+  dragging.value = id
+  event.dataTransfer?.setData('text/plain', id)
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+}
+function onDragEnd() { dragging.value = ''; over.value = '' }
+function dropOn(chapter: string, before = '') {
+  const id = dragging.value
+  onDragEnd()
+  if (!id || id === before) return
+  void reorder(moveLessonTo(order.value, id, chapter, before))
+}
+const shiftLesson = (id: string, offset: -1 | 1) => reorder(moveLessonBy(order.value, id, offset))
+const shiftChapter = (id: string, offset: -1 | 1) => reorder(moveChapterBy(order.value, id, offset))
 function openNext(lesson: Rec<Lesson>) { openLesson(lesson.id, nextStep(lessonSteps(lesson, state.snapshot))) }
 </script>
 
@@ -53,13 +90,40 @@ function openNext(lesson: Rec<Lesson>) { openLesson(lesson.id, nextStep(lessonSt
     </section>
 
     <template v-if="state.courseID">
-      <section v-for="group in groups" :key="group.key" class="lesson-chapter">
-        <h2 v-if="chapters.length" class="chapter-heading"><Icon name="chapter" /> {{ group.chapter ? group.chapter.data.name : t('unfiled') }} <span class="count">{{ group.lessons.length }}</span></h2>
+      <section v-if="course" class="panel course-settings">
+        <button type="button" class="chapter-toggle" :aria-expanded="settingsOpen" @click="settingsOpen = !settingsOpen">
+          <span class="chapter-caret" :class="{ closed: !settingsOpen }">▾</span> <strong>{{ t('courseSettings') }}</strong>
+          <span class="caption">{{ courseDefaults.audience || '—' }} · {{ t('level_' + courseDefaults.level) }} · {{ courseDefaults.minutes }} {{ t('minutesShort') }} · {{ t('depth_' + courseDefaults.depth) }}</span>
+        </button>
+        <template v-if="settingsOpen">
+          <p class="caption">{{ t('courseSettingsHint') }}</p>
+          <SettingsFields mode="default" :model-value="course.data.settings" :busy="!!state.busy" @save="saveCourseSettings" />
+        </template>
+      </section>
+      <p v-if="lessons.length > 1" class="caption order-hint">{{ t('teachingOrderHint') }}</p>
+      <section v-for="group in groups" :key="group.key" class="lesson-chapter" :class="{ 'drop-target': over === 'group:' + group.key }" @dragover.prevent="over = 'group:' + group.key" @dragleave.self="over = ''" @drop.prevent.stop="dropOn(group.key)">
+        <div v-if="chapters.length" class="chapter-head">
+          <h2 class="chapter-heading"><Icon name="chapter" /> {{ group.chapter ? group.chapter.data.name : t('unfiled') }} <span class="count">{{ group.lessons.length }}</span></h2>
+          <div v-if="group.chapter" class="button-row chapter-tools">
+            <button class="icon-button" :title="t('moveUp')" :aria-label="t('moveUp') + ' · ' + group.chapter.data.name" @click="shiftChapter(group.key, -1)">↑</button>
+            <button class="icon-button" :title="t('moveDown')" :aria-label="t('moveDown') + ' · ' + group.chapter.data.name" @click="shiftChapter(group.key, 1)">↓</button>
+            <button class="text-button" @click="chapterSettings = chapterSettings === group.key ? '' : group.key">{{ t('chapterSettings') }}</button>
+            <button class="text-button" @click="renameChapter(group.chapter)">{{ t('renameChapter') }}</button>
+            <button class="text-button danger" @click="deleteChapter(group.chapter)">{{ t('deleteChapter') }}</button>
+          </div>
+        </div>
+        <div v-if="group.chapter && chapterSettings === group.key" class="panel chapter-settings">
+          <SettingsFields mode="override" :model-value="group.chapter.data.settings" :inherited="inheritedForChapter" :busy="!!state.busy" @save="saveChapterSettings(group.chapter, $event)" />
+        </div>
         <p v-if="!group.lessons.length" class="empty-inline">{{ t('chapterEmpty') }}</p>
         <div class="lesson-grid">
-          <article v-for="lesson in group.lessons" :key="lesson.id" class="lesson-card">
+          <article v-for="lesson in group.lessons" :key="lesson.id" class="lesson-card" :class="{ dragging: dragging === lesson.id, 'drop-before': over === lesson.id }" draggable="true" @dragstart="onDragStart($event, lesson.id)" @dragend="onDragEnd" @dragover.prevent.stop="over = lesson.id" @dragleave.self="over = ''" @drop.prevent.stop="dropOn(group.key, lesson.id)">
             <div class="lesson-card-top">
               <label class="check"><input v-model="state.selected" type="checkbox" :value="lesson.id" :aria-label="t('selectForBatch') + ' · ' + lesson.data.title"></label>
+              <span class="button-row">
+                <button class="icon-button" :title="t('moveUp')" :aria-label="t('moveUp') + ' · ' + lesson.data.title" @click="shiftLesson(lesson.id, -1)">←</button>
+                <button class="icon-button" :title="t('moveDown')" :aria-label="t('moveDown') + ' · ' + lesson.data.title" @click="shiftLesson(lesson.id, 1)">→</button>
+              </span>
             </div>
             <h2><button class="lesson-title" @click="openNext(lesson)">{{ lesson.data.title }}</button></h2>
             <StepDots :lesson="lesson" labelled />

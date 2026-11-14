@@ -103,8 +103,8 @@ func TestOutputsAreWrittenFromThePagesAndTheUsersWishes(t *testing.T) {
 	}
 
 	reader := run("A", "deep")
-	if len(prompts) != 6 {
-		t.Fatalf("six sections; related work is skipped when the lesson has none: %d", len(prompts))
+	if len(prompts) != 7 {
+		t.Fatalf("one prompt per knowledge section: %d", len(prompts))
 	}
 	for i, prompt := range prompts {
 		if !strings.Contains(prompt, "Explain every equation twice.") || strings.Contains(prompt, "Put the equations on the slides.") {

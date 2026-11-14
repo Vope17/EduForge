@@ -255,7 +255,7 @@ func (a *App) StartRequest(ctx context.Context, owner, requestID, ui string, use
 	known := []string{}
 	for _, target := range targets {
 		for _, kind := range target.Settings.Selected {
-			total := 6
+			total := len(research.SectionOrder)
 			t := domain.Task{RequestID: requestID, Type: kind, Status: "queued", Stage: "generate", Language: language(req, target, kind), KnowledgeID: target.KnowledgeID, Settings: target.Settings, Style: targetStyle(req, target, kind), Total: total}
 			if kind == "A" {
 				t.ReadTerms = known
@@ -495,6 +495,9 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 	}
 	if t.Type == "parse" {
 		return a.parseTask(ctx, owner, r)
+	}
+	if t.Type == "knowledge" {
+		return a.knowledgeTask(ctx, owner, r)
 	}
 	_, k, err := get[domain.Knowledge](ctx, a, owner, t.KnowledgeID, "knowledge")
 	if err != nil {
@@ -893,7 +896,7 @@ func (a *App) parseTask(ctx context.Context, owner string, task domain.Record) e
 			t.Stage = "knowledge"
 			return nil
 		})
-		if written, err := a.writeKnowledge(ctx, owner, k); err == nil {
+		if written, err := a.writeKnowledge(ctx, owner, task.Lesson, k, nil, a.progressOffset(ctx, owner, task.ID, completed)); err == nil {
 			k = written
 		} else if ctx.Err() != nil {
 			return ctx.Err()

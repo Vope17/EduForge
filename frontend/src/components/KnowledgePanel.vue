@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useWorkspace } from '../lib/workspace.ts'
+import { ACTIVE } from '../lib/status.ts'
 import Icon from './Icon.vue'
 import type { Knowledge, Unit } from '../api/types.ts'
 
-// The shared knowledge every output of a study is written from: key points
-// per section (written by AI when a model is connected, otherwise excerpts
-// of the source), key terms and the evaluation conditions.
+// The knowledge every output of a lesson is written from: key points per
+// section (written by AI after reading every source page when a model is
+// connected, otherwise excerpts of the source) and key terms. The coverage
+// banner says how much of the sources was read.
 const { state, t, api, act, knowledge, fileURL, citationLabel, explain } = useWorkspace()
 const draft = ref<Knowledge | null>(null), version = ref(0), loaded = ref('')
 // The source passage shown under a point: "<claim index>:<unit id>".
@@ -20,8 +22,9 @@ watch(() => knowledge.value?.id, () => {
 const dirty = computed(() => draft.value && JSON.stringify(draft.value) !== loaded.value)
 const byAI = computed(() => draft.value?.author === 'ai')
 const modelReady = computed(() => state.connection.mode === 'model')
-// Related work (6) follows the motivation, as in the outputs.
-const SECTIONS = [0, 6, 1, 2, 3, 4, 5]
+const SECTIONS = [0, 1, 2, 3, 4, 5, 6]
+// Sections whose points carry a second part: symbols, the solution, the correction.
+const DETAIL = [3, 4, 5]
 const points = (i: number) => (draft.value?.claims || []).map((c, index) => ({ c, index })).filter(x => x.c.section === i)
 const units = computed(() => draft.value?.units || [])
 const unitByID = computed((): Record<string, Unit> => Object.fromEntries(units.value.map(u => [u.id, u])))
@@ -31,20 +34,23 @@ const openUnit = (index: number) => open.value.startsWith(index + ':') ? unitByI
 
 // Points and terms are added only while a draft is shown.
 function addPoint(section: number) {
-  (draft.value!.claims ||= []).push({ section, text: '', citations: units.value[0] ? [units.value[0].id] : [], verified: false, kind: 'manual' })
+  (draft.value!.claims ||= []).push({ section, text: '', detail: '', citations: units.value[0] ? [units.value[0].id] : [], verified: false, kind: 'manual' })
 }
 function removePoint(index: number) { draft.value?.claims?.splice(index, 1); open.value = '' }
 function addTerm() { (draft.value!.terms ||= []).push({ original: '', en: '', 'zh-TW': '', abbreviation: '', definition: '', citations: units.value[0] ? [units.value[0].id] : [], context: draft.value!.title }) }
 function sourceRecord(id: string) { return (state.snapshot.source || []).find(x => x.id === id) }
 
 async function save() { await act(() => api(`/lessons/${state.lessonID}/knowledge`, { method: 'PUT', body: { version: version.value, knowledge: draft.value } })) }
-const writing = ref(false)
-async function rewrite() {
-  if ((dirty.value || byAI.value) && !confirm(t(dirty.value ? 'knowledgeRewriteDiscard' : 'knowledgeRewriteConfirm'))) return
-  writing.value = true
-  await act(() => api(`/lessons/${state.lessonID}/knowledge/ai`, { method: 'POST', body: { version: version.value } }))
-  writing.value = false
+// A read is a background task; its progress shows in the task list.
+const writing = computed(() => (state.snapshot.task || []).some(x => x.lesson_id === state.lessonID && ['parse', 'knowledge'].includes(x.data.type) && ACTIVE.includes(x.data.status)))
+async function rewrite(missedOnly = false) {
+  if (!missedOnly && (dirty.value || byAI.value) && !confirm(t(dirty.value ? 'knowledgeRewriteDiscard' : 'knowledgeRewriteConfirm'))) return
+  if (missedOnly && dirty.value && !confirm(t('knowledgeRewriteDiscard'))) return
+  await act(() => api(`/lessons/${state.lessonID}/knowledge/ai`, { method: 'POST', body: { version: version.value, missed_only: missedOnly } }))
 }
+const coverage = computed(() => draft.value?.coverage)
+const missed = computed(() => coverage.value?.missed || [])
+const isVision = (id: string) => unitByID.value[id]?.mode === 'vision'
 const rows = (text: string | undefined) => Math.min(8, Math.max(2, Math.ceil((text || '').length / 60)))
 </script>
 
@@ -62,9 +68,19 @@ const rows = (text: string | undefined) => Math.min(8, Math.max(2, Math.ceil((te
           <strong>{{ t(byAI ? 'knowledgeByAI' : 'knowledgeByRules') }}</strong>
           <p class="caption">{{ byAI ? t('knowledgeByAIHint') : (draft.ai_error ? t('knowledgeNoAI').replace('{reason}', explain(draft.ai_error)) : t('knowledgeByRulesHint')) }}</p>
         </div>
-        <button type="button" class="secondary small knowledge-rewrite" :disabled="!modelReady || writing || !!state.busy" :title="modelReady ? '' : t('aiNeedsModel')" @click="rewrite">
+        <button type="button" class="secondary small knowledge-rewrite" :disabled="!modelReady || writing || !!state.busy" :title="modelReady ? '' : t('aiNeedsModel')" @click="rewrite(false)">
           <Icon name="sparkle" /> {{ t(writing ? 'knowledgeWriting' : byAI ? 'knowledgeRewrite' : 'knowledgeWrite') }}
         </button>
+      </div>
+
+      <div v-if="coverage" class="knowledge-coverage" :class="{ incomplete: missed.length }">
+        <strong>{{ t('coverageTitle') }}</strong>
+        <span>{{ t('coverageSummary').replace('{read}', String(coverage.read)).replace('{pages}', String(coverage.pages)).replace('{vision}', String(coverage.vision)) }}</span>
+        <template v-if="missed.length">
+          <span class="pill warning">{{ t('coverageMissed').replace('{n}', String(missed.length)).replace('{pages}', missed.slice(0, 8).map(citationLabel).join('、') + (missed.length > 8 ? '…' : '')) }}</span>
+          <button type="button" class="secondary small" :disabled="!modelReady || writing || !!state.busy" @click="rewrite(true)">{{ t('coverageResume') }}</button>
+        </template>
+        <span v-else class="pill success">{{ t('coverageComplete') }}</span>
       </div>
 
       <div class="knowledge-sections">
@@ -76,9 +92,13 @@ const rows = (text: string | undefined) => Math.min(8, Math.max(2, Math.ceil((te
               <textarea v-model="c.text" :rows="rows(c.text)" :aria-label="t('ksec' + i)"></textarea>
               <button type="button" class="icon-button danger" :title="t('delete')" :aria-label="t('delete')" @click="removePoint(index)">×</button>
             </div>
+            <label v-if="DETAIL.includes(i) || c.detail" class="knowledge-detail">{{ t('detail_' + (DETAIL.includes(i) ? i : 'other')) }}
+              <textarea v-model="c.detail" :rows="rows(c.detail)"></textarea>
+            </label>
             <div class="citation-list">
               <button v-for="id in c.citations" :key="id" type="button" class="citation" :class="{ on: open === `${index}:${id}` }" :title="t('knowledgeShowSource')" @click="toggleSource(index, id)">{{ citationLabel(id) }}</button>
               <select v-if="c.kind === 'manual'" v-model="c.citations![0]" class="citation-select" :aria-label="t('citation')"><option v-for="u in units" :key="u.id" :value="u.id">{{ citationLabel(u.id) }}</option></select>
+              <span v-if="c.vision || c.citations?.some(isVision)" class="pill vision" :title="t('visionHint')">{{ t('visionPage') }}</span>
               <span v-if="c.unsupported?.length" class="pill warning knowledge-unsupported">{{ t('knowledgeUnsupported').replace('{numbers}', c.unsupported.join('、')) }}</span>
             </div>
             <blockquote v-if="openUnit(index)" class="knowledge-quote">{{ openUnit(index)?.text }}</blockquote>
@@ -88,7 +108,6 @@ const rows = (text: string | undefined) => Math.min(8, Math.max(2, Math.ceil((te
       </div>
 
       <details><summary>{{ t('terms') }} <span class="count">{{ (draft.terms || []).length }}</span></summary><div class="table-scroll"><table class="term-table"><thead><tr><th>{{ t('original') }}</th><th>{{ t('english') }}</th><th>{{ t('chinese') }}</th><th>{{ t('definition') }}</th><th>{{ t('citation') }}</th><th></th></tr></thead><tbody><tr v-for="(term,index) in draft.terms" :key="index"><td><input v-model="term.original" required></td><td><input v-model="term.en"></td><td><input v-model="term['zh-TW']"></td><td><textarea v-model="term.definition" rows="2"></textarea></td><td><select v-model="term.citations![0]"><option v-for="unit in units" :key="unit.id" :value="unit.id">{{ citationLabel(unit.id) }}</option></select></td><td><button type="button" class="icon-button danger" @click="draft.terms!.splice(index,1)">×</button></td></tr></tbody></table></div><button type="button" class="text-button" @click="addTerm">＋ {{ t('addTerm') }}</button></details>
-      <details open><summary>{{ t('conditions') }}</summary><p class="caption">{{ t('conditionsHint') }}</p><div class="form-grid"><label v-for="key in ['task','dataset','split','metric','evaluation']" :key="key">{{ t(key) }}<input v-model="draft.conditions[key]"></label></div></details>
       <details><summary>{{ t('sourceText') }}</summary><details v-for="unit in units" :key="unit.id" class="source-unit"><summary>{{ citationLabel(unit.id) }}</summary><a v-if="unit.preview && sourceRecord(unit.source_id)" :href="fileURL(sourceRecord(unit.source_id)!, unit.preview)" target="_blank" rel="noopener"><img :src="fileURL(sourceRecord(unit.source_id)!, unit.preview)" class="source-preview" :alt="citationLabel(unit.id)" loading="lazy"></a><pre>{{ unit.text }}</pre></details></details>
 
       <div class="form-actions"><label class="check"><input v-model="draft.confirmed" type="checkbox">{{ t('confirmKnowledge') }}</label><button class="primary" :disabled="!!state.busy">{{ t('saveKnowledge') }}</button></div>

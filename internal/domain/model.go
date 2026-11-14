@@ -147,6 +147,13 @@ type Claim struct {
 	// Unsupported lists numbers in an AI-written point that its cited
 	// passages do not contain.
 	Unsupported []string `json:"unsupported,omitempty"`
+	// Detail is the part of a point that goes with its statement: the
+	// solution of a worked example, the correction of a misconception, the
+	// symbols of a formula.
+	Detail string `json:"detail,omitempty"`
+	// Vision marks a point that cites a page the model read from its image
+	// (a scan or a picture-only slide), so the user checks it against the page.
+	Vision bool `json:"vision,omitempty"`
 }
 type Term struct {
 	Original     string   `json:"original"`
@@ -158,29 +165,39 @@ type Term struct {
 	Context      string   `json:"context"`
 	Deprecated   []string `json:"deprecated,omitempty"`
 }
-type Conditions struct {
-	Task       string `json:"task"`
-	Dataset    string `json:"dataset"`
-	Split      string `json:"split"`
-	Metric     string `json:"metric"`
-	Evaluation string `json:"evaluation"`
-}
 type Knowledge struct {
-	Title      string     `json:"title"`
-	Claims     []Claim    `json:"claims"`
-	Terms      []Term     `json:"terms"`
-	Units      []Unit     `json:"units"`
-	Images     []Image    `json:"images"`
-	Issues     []Issue    `json:"issues"`
-	Conditions Conditions `json:"conditions"`
-	Confirmed  bool       `json:"confirmed"`
-	Edits      int        `json:"edits"`
+	Title     string  `json:"title"`
+	Claims    []Claim `json:"claims"`
+	Terms     []Term  `json:"terms"`
+	Units     []Unit  `json:"units"`
+	Images    []Image `json:"images"`
+	Issues    []Issue `json:"issues"`
+	Confirmed bool    `json:"confirmed"`
+	Edits     int     `json:"edits"`
 	// Author is "ai" when a model wrote the claims, terms and conditions;
 	// empty for rule-based source excerpts. AIError says why a model was
 	// not used when one was tried.
 	Author   string `json:"author,omitempty"`
 	Language string `json:"language,omitempty"`
 	AIError  string `json:"ai_error,omitempty"`
+	// Coverage says how much of the sources a model read when it wrote this
+	// knowledge. Nil for rule-based excerpts and for knowledge a person wrote.
+	Coverage *Coverage `json:"coverage,omitempty"`
+}
+
+// Coverage records how completely a model read the source pages: every page
+// is read in batches, and a batch that failed leaves its pages in Missed.
+type Coverage struct {
+	Pages   int      `json:"pages"`   // pages in the sources
+	Read    int      `json:"read"`    // pages a model read
+	Vision  int      `json:"vision"`  // of those, read from the page image
+	Batches int      `json:"batches"` // model calls made
+	Missed  []string `json:"missed,omitempty"`
+}
+
+// Complete reports whether every page was read.
+func (c *Coverage) Complete() bool {
+	return c != nil && c.Pages > 0 && c.Read >= c.Pages && len(c.Missed) == 0
 }
 
 // Style deliberately excludes language, facts, commands, metrics and permissions.
@@ -272,6 +289,9 @@ type Task struct {
 	ResultID         string         `json:"result_id,omitempty"`
 	Completed        int            `json:"completed"`
 	Total            int            `json:"total"`
+	// MissedOnly makes a knowledge task read only the pages a previous read
+	// missed, and add to the existing knowledge.
+	MissedOnly bool `json:"missed_only,omitempty"`
 }
 type Step struct {
 	TaskID   string  `json:"task_id"`
