@@ -56,7 +56,17 @@ onBeforeUnmount(() => controller.abort())
     class="workspace document-page"
     tabindex="-1"
   >
-    <h1>{{ t('slides.title') }}</h1>
+    <header class="page-heading">
+      <div>
+        <p class="eyebrow">
+          {{ t('app.workspace') }}
+        </p>
+        <h1>{{ t('slides.title') }}</h1>
+        <p class="lede">
+          {{ t('slides.lede') }}
+        </p>
+      </div>
+    </header>
     <div class="document-columns">
       <section class="document-panel">
         <h2>{{ t('slides.create') }}</h2>

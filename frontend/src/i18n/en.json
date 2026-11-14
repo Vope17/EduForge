@@ -5,7 +5,11 @@
     "tagline": "A creative space for educators",
     "skip": "Skip to main content",
     "navigation": "Main navigation",
-    "formats": "Teaching materials"
+    "home": "Home",
+    "menu": "Open menu",
+    "breadcrumb": "Breadcrumb",
+    "editing": "Editing",
+    "workspace": "Teaching workspace"
   },
   "language": {
     "label": "Interface language",
@@ -190,7 +194,8 @@
       "body_too_large": "The document exceeds the save size limit.",
       "invalid_selection": "The AI changes exceed the selection or content limits. No changes were applied. Select again and retry.",
       "image_limit": "This presentation has reached the 200-image upload limit."
-    }
+    },
+    "lede": "Create lesson plans, worksheets or handouts: confirm a template, generate the full document, then edit it section by section."
   },
   "models": {
     "title": "Model connections",
@@ -316,7 +321,8 @@
     "uploadImage": "Upload image",
     "uploadHint": "PNG or JPEG, up to 8 MiB and 8 million pixels; each dimension up to 4096. Save a new revision after uploading.",
     "uploadingImage": "Uploading image…",
-    "imageSizeError": "Images must not exceed 8 MiB."
+    "imageSizeError": "Images must not exceed 8 MiB.",
+    "lede": "Enter a topic and slide count: confirm a one-slide template, generate the deck in the background, then edit, revise with AI and present."
   },
   "downloads": {
     "word": "Download Word",

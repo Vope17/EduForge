@@ -43,14 +43,14 @@ describe('M0 home', () => {
     expect(document.documentElement.lang).toBe('zh-TW')
     expect(app.findAll('.format-card')).toHaveLength(4)
 
-    await app.get('select').setValue('en')
+    await app.get('.language-switch button:last-child').trigger('click')
     expect(app.get('h1').text()).toContain('Less time preparing.')
     expect(app.get('[role="status"]').text()).toContain('Connected.')
-    expect(app.get('button').text()).toContain('Check again')
+    expect(app.get('[data-health-retry]').text()).toContain('Check again')
     expect(document.documentElement.lang).toBe('en')
     expect(document.title).toBe('EduForge | A creative space for educators')
 
-    await app.get('select').setValue('zh-TW')
+    await app.get('.language-switch button:first-child').trigger('click')
     expect(app.get('h1').text()).toContain('把備課時間')
     expect(document.documentElement.lang).toBe('zh-TW')
     expect(document.title).toBe('EduForge｜教育工作者的創作空間')
@@ -64,8 +64,8 @@ describe('M0 home', () => {
     const app = await mountApp()
 
     expect(app.get('[role="status"]').text()).toContain('暫時無法連線')
-    expect(app.get('button').attributes('disabled')).toBeUndefined()
-    await app.get('button').trigger('click')
+    expect(app.get('[data-health-retry]').attributes('disabled')).toBeUndefined()
+    await app.get('[data-health-retry]').trigger('click')
     await flushPromises()
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -83,11 +83,11 @@ describe('M0 home', () => {
       }),
     ))
     const app = await mountApp()
-    expect(app.get('button').attributes('disabled')).toBeDefined()
+    expect(app.get('[data-health-retry]').attributes('disabled')).toBeDefined()
 
     await vi.advanceTimersByTimeAsync(5000)
     expect(app.get('[role="status"]').text()).toContain('暫時無法連線')
-    expect(app.get('button').attributes('disabled')).toBeUndefined()
+    expect(app.get('[data-health-retry]').attributes('disabled')).toBeUndefined()
   })
 
   it('cancels the health request when the view is removed', async () => {

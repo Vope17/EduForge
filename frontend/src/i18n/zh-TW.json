@@ -5,7 +5,11 @@
     "tagline": "教育工作者的創作空間",
     "skip": "跳至主要內容",
     "navigation": "主要導覽",
-    "formats": "教學產物"
+    "home": "首頁",
+    "menu": "開啟選單",
+    "breadcrumb": "目前位置",
+    "editing": "編輯",
+    "workspace": "教學工作區"
   },
   "language": {
     "label": "介面語言",
@@ -190,7 +194,8 @@
       "body_too_large": "文檔內容超過儲存大小限制。",
       "invalid_selection": "AI 修改超出選取範圍或內容限制，未套用任何修改。請重新選取後再試。",
       "image_limit": "此簡報已達 200 張圖片上傳上限。"
-    }
+    },
+    "lede": "建立教案、學習單或講義：先確認樣板，再生成完整文檔，並可在線上逐段編修。"
   },
   "models": {
     "title": "模型連線",
@@ -316,7 +321,8 @@
     "uploadImage": "上傳圖片",
     "uploadHint": "PNG 或 JPEG，最多 8 MiB、800 萬像素，長寬各不超過 4096。上傳後請儲存新版本。",
     "uploadingImage": "正在上傳圖片…",
-    "imageSizeError": "圖片不可超過 8 MiB。"
+    "imageSizeError": "圖片不可超過 8 MiB。",
+    "lede": "輸入課程主題與頁數：先確認一頁樣板，再於背景生成完整簡報，完成後可編修、AI 修改與播放。"
   },
   "downloads": {
     "word": "下載 Word",
