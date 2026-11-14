@@ -178,7 +178,21 @@
       "chooseRevision": "選擇要檢視的版本",
       "revisionOption": "第 {number} 版 · {title}",
       "restore": "還原此版本",
-      "clearSelection": "清除 {count} 個選取範圍"
+      "clearSelection": "清除 {count} 個選取範圍",
+      "discardConfirm": "捨棄所有尚未儲存的修改？",
+      "newHeading": "新標題",
+      "insert": "插入",
+      "selectionHint": "勾選區塊、反白文字，或從頁面空白處拖曳框選。",
+      "blockLabel": "區塊 {number}（{kind}）",
+      "imageEmpty": "輸入 HTTPS 圖片網址後顯示圖片",
+      "aiHint": "勾選左側方框、反白文字，或從頁面空白處拖曳框選要修改的區塊。",
+      "placeholders": {
+        "heading": "標題",
+        "paragraph": "輸入段落文字…",
+        "list": "清單說明（可留空）",
+        "table": "表格說明（可留空）",
+        "image": "圖片說明"
+      }
     },
     "errors": {
       "plan_permission": "請重新連接 ChatGPT，並允許使用訂閱額度。",
@@ -333,5 +347,52 @@
     "failed": "下載失敗，請稍後重試。",
     "assetsFailed": "無法載入匯出所需的圖片或字型，請檢查圖片網址或使用上傳圖片。",
     "layoutFailed": "投影片文字過多，請縮短文字或分成更多頁後重新下載。"
+  },
+  "editor": {
+    "tabs": {
+      "edit": "編輯",
+      "preview": "預覽",
+      "history": "版本紀錄"
+    },
+    "saveCreatesVersion": "每次儲存都會建立新版本",
+    "undo": "復原",
+    "redo": "重做"
+  },
+  "ai": {
+    "title": "AI 修改",
+    "close": "關閉 AI 修改",
+    "selected": "已選取 {count} 處",
+    "clear": "清除選取",
+    "saveFirst": "請先儲存手動修改，再提出 AI 修改。",
+    "quick": {
+      "concise": "精簡",
+      "conciseText": "把選取內容改得更精簡，保留重點。",
+      "casual": "更口語",
+      "casualText": "把選取內容改得更口語、更適合在課堂上說明。",
+      "formal": "更正式",
+      "formalText": "把選取內容改得更正式、用詞更精確。",
+      "example": "加入例子",
+      "exampleText": "在選取內容中加入一個貼近學生生活的例子。"
+    },
+    "instruction": "只針對選取部分的修改指示",
+    "working": "AI 修改中…",
+    "propose": "預覽 AI 修改",
+    "review": "確認修改前後差異",
+    "before": "修改前",
+    "after": "修改後",
+    "stale": "這份建議是針對較舊的版本，請重新提出。",
+    "accept": "接受並建立新版本",
+    "reject": "捨棄建議",
+    "partialText": "部分文字"
+  },
+  "revisions": {
+    "title": "版本紀錄",
+    "current": "目前為第 {number} 版",
+    "saveFirst": "請先儲存或捨棄目前的修改，再切換版本。",
+    "undo": "回到上一版",
+    "redo": "重做下一版",
+    "number": "第 {number} 版",
+    "restore": "還原此版本",
+    "choose": "選擇左側的版本以檢視內容。"
   }
 }

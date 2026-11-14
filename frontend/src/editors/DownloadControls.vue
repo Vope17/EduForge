@@ -2,6 +2,7 @@
 import { onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { SavedDocument } from '../api/documents'
+import AppIcon from '../components/AppIcon.vue'
 
 const props = defineProps<{ document: SavedDocument; kind: 'document' | 'slides'; disabled?: boolean; dirty?: boolean }>()
 const { t } = useI18n()
@@ -44,17 +45,38 @@ onBeforeUnmount(() => { controller.abort(); for (const url of urls) URL.revokeOb
 </script>
 
 <template>
-  <div class="document-fields">
-    <div class="document-actions">
-      <button type="button" :disabled="disabled || dirty || busy" @click="download(kind === 'slides' ? 'pptx' : 'docx')">
-        {{ t(kind === 'slides' ? 'downloads.powerpoint' : 'downloads.word') }}
+  <div class="downloads">
+    <div class="button-row">
+      <button
+        type="button"
+        class="small"
+        :disabled="disabled || dirty || busy"
+        :title="dirty ? t('downloads.saveFirst') : undefined"
+        @click="download(kind === 'slides' ? 'pptx' : 'docx')"
+      >
+        <AppIcon name="download" />{{ t(kind === 'slides' ? 'downloads.powerpoint' : 'downloads.word') }}
       </button>
-      <button type="button" :disabled="disabled || dirty || busy" @click="download('pdf')">
-        {{ t('downloads.pdf') }}
+      <button
+        type="button"
+        class="small"
+        :disabled="disabled || dirty || busy"
+        :title="dirty ? t('downloads.saveFirst') : undefined"
+        @click="download('pdf')"
+      >
+        <AppIcon name="download" />{{ t('downloads.pdf') }}
       </button>
-      <span v-if="busy" role="status">{{ t('downloads.preparing') }}</span>
+      <span
+        v-if="busy"
+        class="caption"
+        role="status"
+      >{{ t('downloads.preparing') }}</span>
     </div>
-    <p v-if="dirty" class="document-muted">{{ t('downloads.saveFirst') }}</p>
-    <p v-if="error" role="alert" class="document-error">{{ t(error) }}</p>
+    <p
+      v-if="error"
+      role="alert"
+      class="document-error"
+    >
+      {{ t(error) }}
+    </p>
   </div>
 </template>

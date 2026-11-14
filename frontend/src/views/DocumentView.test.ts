@@ -108,14 +108,16 @@ describe('teaching documents', () => {
     vi.stubGlobal('fetch', fetchMock)
     const app = await open('/documents/water')
 
-    const buttons = app.findAll('main button[aria-pressed]')
-    await buttons[0].trigger('click')
-    await buttons[1].trigger('click')
-    expect(app.findAll('main button[aria-pressed="true"]')).toHaveLength(2)
+    await app.get('.ai-toggle').trigger('click')
+    const boxes = app.findAll('.doc-select input')
+    await boxes[0].setValue(true)
+    await boxes[1].setValue(true)
+    expect(app.get('.ai-panel [role="status"]').text()).toBe('已選取 2 處')
 
     await app.get('textarea[aria-label="區塊 2 的文字"]').setValue('觀察蒸發與凝結。')
-    expect(app.findAll('main button[aria-pressed="true"]')).toHaveLength(1)
-    await app.get('form').trigger('submit')
+    expect(app.get('.ai-panel [role="status"]').text()).toBe('已選取 1 處')
+    expect(app.text()).toContain('請先儲存手動修改')
+    await app.get('[data-save]').trigger('click')
     await flushPromises()
     const [, options] = fetchMock.mock.calls[1]
     const sent = JSON.parse(options.body)
@@ -125,6 +127,40 @@ describe('teaching documents', () => {
       content: { blocks: [{ id: 'heading' }, { id: 'paragraph', text: '觀察蒸發與凝結。' }] },
     })
     expect(app.text()).toContain('修訂第 2 版')
+  })
+
+  it('proposes an AI edit for the selected block and accepts it as a new revision', async () => {
+    const proposal = {
+      proposal_id: 'p1', base_revision: 1,
+      changes: [{ block_id: 'paragraph', field: 'text', before: '觀察水的變化。', after: '記錄水在一天中的變化。' }],
+    }
+    const accepted = {
+      ...ready, revision: 2, can_undo: true,
+      content: { ...ready.content, blocks: [ready.content.blocks[0], { ...ready.content.blocks[1], text: proposal.changes[0].after }] },
+    }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json({ request: { ...pending, state: 'ready' }, document: ready }))
+      .mockResolvedValueOnce(json(proposal))
+      .mockResolvedValueOnce(json(accepted))
+    vi.stubGlobal('fetch', fetchMock)
+    const app = await open('/documents/water')
+
+    await app.get('.ai-toggle').trigger('click')
+    await app.findAll('.doc-select input')[1].setValue(true)
+    await app.get('.ai-instruction textarea').setValue('寫得更具體')
+    await app.get('.ai-instruction').trigger('submit')
+    await flushPromises()
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/v1/documents/water/patches', expect.objectContaining({
+      body: JSON.stringify({ base_revision: 1, instruction: '寫得更具體', selection: [{ artifact_id: 'water', block_id: 'paragraph' }] }),
+    }))
+    expect(app.get('.ai-diff del').text()).toBe('觀察水的變化。')
+    expect(app.get('.ai-diff ins').text()).toBe('記錄水在一天中的變化。')
+
+    await app.findAll('.ai-results button').find((button) => button.text() === '接受並建立新版本')!.trigger('click')
+    await flushPromises()
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/v1/documents/water/patches/p1/accept', expect.anything())
+    expect(app.text()).toContain('修訂第 2 版')
+    expect(app.find('.ai-diff').exists()).toBe(false)
   })
 
   it('uses the UI locale as the default generation language until overridden', async () => {

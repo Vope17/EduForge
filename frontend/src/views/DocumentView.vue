@@ -2,7 +2,8 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { documentErrorKey, documents, type Change, type DocumentDetails, type RevisionSummary, type SavedDocument } from '../api/documents'
+import { documentErrorKey, documents, type Change, type DocumentDetails, type PatchProposal, type RevisionSummary, type SavedDocument } from '../api/documents'
+import type { Anchor } from '../selection/useSelection'
 import DocumentEditor from '../editors/document/DocumentEditor.vue'
 import DocumentPreview from '../editors/document/DocumentPreview.vue'
 
@@ -15,6 +16,7 @@ const errorKey = ref('')
 const feedback = ref('')
 const history = ref<RevisionSummary[]>([])
 const previous = ref<SavedDocument>()
+const proposal = ref<PatchProposal>()
 const fields = ['palette', 'font', 'layout', 'tone', 'density'] as const
 
 async function run(action: () => Promise<void>) {
@@ -70,6 +72,34 @@ function change(update: Change) {
     current.document = await documents.change(id, revision, update, controller.signal)
     history.value = []
     previous.value = undefined
+    proposal.value = undefined
+  })
+}
+
+function propose(instruction: string, selection: Anchor[]) {
+  const revision = details.value?.document?.revision
+  if (!revision) return
+  return run(async () => { proposal.value = await documents.propose(id, revision, instruction, selection, controller.signal) })
+}
+
+function accept() {
+  const current = details.value
+  const pending = proposal.value
+  if (!current || !pending) return
+  return run(async () => {
+    current.document = await documents.accept(id, pending.proposal_id, controller.signal)
+    proposal.value = undefined
+    previous.value = undefined
+    history.value = []
+  })
+}
+
+function reject() {
+  const pending = proposal.value
+  if (!pending) return
+  return run(async () => {
+    await documents.reject(id, pending.proposal_id, controller.signal)
+    proposal.value = undefined
   })
 }
 
@@ -102,6 +132,7 @@ onBeforeUnmount(() => controller.abort())
     >{{ t('documents.back') }}</RouterLink>
     <p
       v-if="busy"
+      class="busy-toast"
       role="status"
     >
       {{ t('documents.working') }}
@@ -135,23 +166,32 @@ onBeforeUnmount(() => controller.abort())
     >{{ t('models.manageUsage') }}</a>
 
     <template v-if="details">
-      <h1>{{ details.document?.content.title ?? details.request.topic }}</h1>
-      <p class="document-muted">
-        {{ t('documents.kinds.' + details.request.kind) }} ·
-        {{ t(details.request.language === 'zh-TW' ? 'language.zhTW' : 'language.en') }} ·
-        {{ t('documents.states.' + details.request.state) }}
-      </p>
+      <header class="page-heading compact">
+        <div>
+          <p class="eyebrow">
+            {{ t('documents.kinds.' + details.request.kind) }} ·
+            {{ t(details.request.language === 'zh-TW' ? 'language.zhTW' : 'language.en') }} ·
+            {{ t('documents.states.' + details.request.state) }}
+          </p>
+          <h1>{{ details.document?.content.title ?? details.request.topic }}</h1>
+        </div>
+      </header>
 
       <DocumentEditor
         v-if="details.document"
         :document="details.document"
         :spec="details.request.template"
+        :kicker="t('documents.kinds.' + details.request.kind)"
         :pending="busy"
         :history="history"
         :previous="previous"
+        :proposal="proposal"
         @change="change"
         @history="loadHistory"
         @view-revision="viewRevision"
+        @propose="propose"
+        @accept="accept"
+        @reject="reject"
       />
 
       <section

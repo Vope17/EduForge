@@ -1,26 +1,41 @@
 <script setup lang="ts">
-import DownloadControls from '../DownloadControls.vue'
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch, type Directive } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import type { Block, BlockKind, Change, Content, RevisionSummary, SavedDocument, TemplateSpec } from '../../api/documents'
-import { useSelection } from '../../selection/useSelection'
+import type { Block, BlockKind, Change, Content, PatchProposal, RevisionSummary, SavedDocument, TemplateSpec } from '../../api/documents'
+import { useSelection, type Anchor } from '../../selection/useSelection'
+import AppIcon from '../../components/AppIcon.vue'
+import DownloadControls from '../DownloadControls.vue'
+import EditorTabs from '../EditorTabs.vue'
+import AIEditPanel from '../AIEditPanel.vue'
+import RevisionPanel from '../RevisionPanel.vue'
+import { useUndo } from '../useUndo'
 import DocumentPreview from './DocumentPreview.vue'
 
+// Word-style editing as in Paper2Lab: one page, each block edited in place,
+// block tools on hover, an AI side panel for the selected parts and the
+// saved versions in their own tab.
 const props = defineProps<{
   document: SavedDocument
   spec?: TemplateSpec
+  /** Kind of document, shown above the title (e.g. "Worksheet"). */
+  kicker: string
   pending: boolean
   history: RevisionSummary[]
   previous?: SavedDocument
+  proposal?: PatchProposal
 }>()
 const emit = defineEmits<{
   change: [change: Change]
   history: []
   viewRevision: [revision: number]
+  propose: [instruction: string, anchors: Anchor[]]
+  accept: []
+  reject: []
 }>()
 const { t } = useI18n()
 const kinds: BlockKind[] = ['heading', 'paragraph', 'list', 'table', 'image']
+const limits = { blocks: 80, items: 20, rows: 20, columns: 8 }
 
 interface EditableBlock {
   key: string
@@ -31,19 +46,31 @@ interface EditableBlock {
   rows: string[][]
   imageURL: string
 }
+interface Draft { title: string; blocks: EditableBlock[] }
 
 let nextKey = 0
-const title = ref('')
-const blocks = ref<EditableBlock[]>([])
-const newKind = ref<BlockKind>('paragraph')
-const dirty = ref(false)
-const showPreview = ref(false)
-const { anchors, toggle, addText, remove, clear } = useSelection(() => props.document.id)
-const selected = computed(() => new Set(anchors.value.map((anchor) => anchor.block_id)))
+const draft = ref<Draft>({ title: '', blocks: [] })
+const saved = ref('')
+const tab = ref('edit')
+const aiOpen = ref(false)
+// The block the caret was last in; new blocks go below it.
+const focused = ref(-1)
+const page = ref<HTMLElement>()
 
-function reset() {
-  title.value = props.document.content.title
-  blocks.value = props.document.content.blocks.map((block) => ({
+// Compares content only; the per-block render keys are not part of it.
+const snapshot = (value: Draft) => JSON.stringify(value, (name, field) => name === 'key' ? undefined : field)
+const dirty = computed(() => snapshot(draft.value) !== saved.value)
+
+const selection = useSelection(() => props.document.id, () => Array.from(page.value?.querySelectorAll<HTMLElement>('[data-block-id]') ?? [])
+  .map((element) => {
+    const rect = element.getBoundingClientRect()
+    return { blockID: element.dataset.blockId!, rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height } }
+  }))
+const { anchors, rectangle } = selection
+const selected = computed(() => new Set(anchors.value.filter((anchor) => anchor.start === undefined).map((anchor) => anchor.block_id)))
+
+function editable(block: Block): EditableBlock {
+  return {
     key: block.id ?? 'new-' + nextKey++,
     id: block.id,
     kind: block.kind,
@@ -51,17 +78,27 @@ function reset() {
     items: block.items?.slice() ?? [],
     rows: block.rows?.map((row) => row.slice()) ?? [],
     imageURL: block.image_url ?? '',
-  }))
-  dirty.value = false
-  clear()
+  }
 }
 
+function reset() {
+  draft.value = { title: props.document.content.title, blocks: props.document.content.blocks.map(editable) }
+  saved.value = snapshot(draft.value)
+  selection.clear()
+  void nextTick(() => undo.reset())
+}
+
+const undo = useUndo(
+  () => draft.value,
+  (value: Draft) => { draft.value = value },
+  { enabled: () => tab.value === 'edit' },
+)
 watch(() => props.document, reset, { immediate: true })
 onBeforeRouteLeave(() => !dirty.value || window.confirm(t('documents.editor.discardPrompt')))
 
 const content = computed<Content>(() => ({
-  title: title.value,
-  blocks: blocks.value.map((block): Block => ({
+  title: draft.value.title,
+  blocks: draft.value.blocks.map((block): Block => ({
     id: block.id,
     kind: block.kind,
     text: block.text,
@@ -71,41 +108,45 @@ const content = computed<Content>(() => ({
   })),
 }))
 
-function addBlock() {
-  blocks.value.push({
-    key: 'new-' + nextKey++,
-    kind: newKind.value,
-    text: '',
-    items: [''],
-    rows: [['', '']],
-    imageURL: '',
+function save() {
+  if (!dirty.value || props.pending) return
+  ;(document.activeElement as HTMLElement | null)?.blur?.()
+  emit('change', { action: 'save', content: content.value })
+}
+
+function discard() {
+  if (window.confirm(t('documents.editor.discardConfirm'))) reset()
+}
+
+// Editing a block's text invalidates the AI selection inside it.
+function edited(block: EditableBlock) {
+  if (block.id) selection.remove(block.id)
+}
+
+function addBlock(kind: BlockKind) {
+  const blocks = draft.value.blocks
+  if (blocks.length >= limits.blocks) return
+  const index = focused.value >= 0 && focused.value < blocks.length ? focused.value + 1 : blocks.length
+  blocks.splice(index, 0, {
+    key: 'new-' + nextKey++, kind, text: kind === 'heading' ? t('documents.editor.newHeading') : '',
+    items: [''], rows: [['', ''], ['', '']], imageURL: '',
   })
-  dirty.value = true
+  focused.value = index
+  void nextTick(() => page.value?.querySelector<HTMLElement>(`[data-index="${index}"] :is(input, textarea)`)?.focus())
 }
 
 function removeBlock(index: number) {
-  const block = blocks.value[index]
-  if (block.id) remove(block.id)
-  blocks.value.splice(index, 1)
-  dirty.value = true
+  const block = draft.value.blocks[index]
+  if (draft.value.blocks.length === 1) return
+  if (block.id) selection.remove(block.id)
+  draft.value.blocks.splice(index, 1)
 }
 
 function moveBlock(index: number, delta: number) {
-  const [block] = blocks.value.splice(index, 1)
-  blocks.value.splice(index + delta, 0, block)
-  dirty.value = true
-}
-
-function captureText(block: EditableBlock, event: Event) {
-  if (!block.id) return
-  const area = event.target as HTMLTextAreaElement
-  addText(block.id, area.selectionStart, area.selectionEnd)
-}
-
-function changeList(block: EditableBlock, index?: number) {
-  if (index === undefined) block.items.push('')
-  else block.items.splice(index, 1)
-  dirty.value = true
+  const target = index + delta
+  if (target < 0 || target >= draft.value.blocks.length) return
+  const [block] = draft.value.blocks.splice(index, 1)
+  draft.value.blocks.splice(target, 0, block)
 }
 
 function changeTable(block: EditableBlock, direction: 'row' | 'column', add: boolean) {
@@ -118,174 +159,458 @@ function changeTable(block: EditableBlock, direction: 'row' | 'column', add: boo
       else row.pop()
     }
   }
-  dirty.value = true
 }
 
-function save() {
-  if (!dirty.value || props.pending) return
-  emit('change', { action: 'save', content: content.value })
+// Highlighting text while the AI panel is open selects just that text.
+function captureText(block: EditableBlock, event: Event, field = 'text') {
+  if (!aiOpen.value || !block.id) return
+  const area = event.target as HTMLTextAreaElement
+  selection.addText(block.id, area.selectionStart, area.selectionEnd, field)
 }
+
+function beginBoxSelect(event: PointerEvent) {
+  if (aiOpen.value && !props.pending) selection.beginRectangle(event)
+}
+
+const blockNumber = (id: string) => props.document.content.blocks.findIndex((block) => block.id === id) + 1
+function fieldLabel(id: string, field?: string) {
+  const block = props.document.content.blocks.find((item) => item.id === id)
+  const kind = block ? t('documents.blocks.' + block.kind) : ''
+  const where = t('documents.editor.blockLabel', { number: blockNumber(id), kind })
+  if (field?.startsWith('items.')) return where + ' · ' + t('documents.editor.item', { number: Number(field.slice(6)) + 1 })
+  return where
+}
+const labels = computed(() => anchors.value.map((anchor) =>
+  fieldLabel(anchor.block_id, anchor.field) + (anchor.start === undefined ? '' : ' · ' + t('ai.partialText'))))
+const describe = (change: PatchProposal['changes'][number]) => fieldLabel(change.block_id, change.field)
+
+function propose(instruction: string) {
+  emit('propose', instruction, anchors.value.map((anchor) => ({ ...anchor })))
+}
+
+// Textareas grow with their text, like paragraphs on a page.
+const vAutosize: Directive<HTMLTextAreaElement> = {
+  mounted: (element) => fit(element),
+  updated: (element) => fit(element),
+}
+function fit(element: HTMLTextAreaElement) {
+  element.style.height = 'auto'
+  element.style.height = element.scrollHeight + 'px'
+}
+function grow(event: Event) { fit(event.target as HTMLTextAreaElement) }
+
+const tabs = computed(() => [
+  { key: 'edit', label: t('editor.tabs.edit'), icon: 'pencil' as const },
+  { key: 'preview', label: t('editor.tabs.preview'), icon: 'eye' as const },
+  { key: 'history', label: t('editor.tabs.history'), icon: 'history' as const },
+])
 </script>
 
 <template>
-  <section class="document-panel">
-    <DownloadControls :document="document" kind="document" :disabled="pending" :dirty="dirty" />
-    <div class="document-heading">
-      <div>
-        <p class="document-muted">{{ t('documents.editor.aiNotice') }}</p>
-        <h2>{{ t('documents.editor.revision', { number: document.revision }) }}</h2>
+  <section class="editor-sheet">
+    <header class="editor-head">
+      <div class="grow">
+        <span class="eyebrow">{{ t('documents.editor.revision', { number: document.revision }) }}</span>
+        <p class="caption">
+          {{ t('documents.editor.aiNotice') }}
+        </p>
       </div>
-      <span v-if="dirty" role="status">{{ t('documents.editor.unsaved') }}</span>
-    </div>
-
-    <form @submit.prevent="save">
-      <fieldset class="document-fields" :disabled="pending" @input="dirty = true">
-        <label class="document-field">
-          {{ t('documents.editor.title') }}
-          <input v-model="title" required maxlength="160">
-        </label>
-        <article v-for="(block, index) in blocks" :key="block.key" class="editor-block">
-          <div class="document-actions">
-            <strong>{{ t('documents.blocks.' + block.kind) }}</strong>
-            <button
-              v-if="block.id"
-              type="button"
-              :aria-pressed="selected.has(block.id)"
-              @click="block.id && toggle(block.id)"
-            >
-              {{ t(selected.has(block.id) ? 'documents.editor.deselect' : 'documents.editor.select') }}
-            </button>
-            <button type="button" :disabled="index === 0" @click="moveBlock(index, -1)">
-              {{ t('documents.editor.up') }}
-            </button>
-            <button type="button" :disabled="index === blocks.length - 1" @click="moveBlock(index, 1)">
-              {{ t('documents.editor.down') }}
-            </button>
-            <button type="button" :disabled="blocks.length === 1" @click="removeBlock(index)">
-              {{ t('documents.editor.remove') }}
-            </button>
-          </div>
-
-          <textarea
-            v-model="block.text"
-            rows="3"
-            maxlength="2500"
-            :aria-label="t('documents.editor.blockText', { number: index + 1 })"
-            @input="block.id && remove(block.id)"
-            @select="captureText(block, $event)"
-          />
-
-          <div v-if="block.kind === 'list'" class="document-fields">
-            <div v-for="(_, itemIndex) in block.items" :key="itemIndex" class="document-actions">
-              <input
-                v-model="block.items[itemIndex]"
-                maxlength="400"
-                :aria-label="t('documents.editor.item', { number: itemIndex + 1 })"
-              >
-              <button type="button" :disabled="block.items.length === 1" @click="changeList(block, itemIndex)">
-                {{ t('documents.editor.removeItem') }}
-              </button>
-            </div>
-            <button type="button" :disabled="block.items.length >= 20" @click="changeList(block)">
-              {{ t('documents.editor.addItem') }}
-            </button>
-          </div>
-
-          <div v-if="block.kind === 'table'" class="document-fields">
-            <div class="document-table">
-              <table>
-                <tbody>
-                  <tr v-for="(row, rowIndex) in block.rows" :key="rowIndex">
-                    <td v-for="(_, column) in row" :key="column">
-                      <input
-                        v-model="row[column]"
-                        maxlength="400"
-                        :aria-label="t('documents.editor.cell', { row: rowIndex + 1, column: column + 1 })"
-                      >
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="document-actions">
-              <button type="button" :disabled="block.rows.length >= 20" @click="changeTable(block, 'row', true)">
-                {{ t('documents.editor.addRow') }}
-              </button>
-              <button type="button" :disabled="block.rows.length === 1" @click="changeTable(block, 'row', false)">
-                {{ t('documents.editor.removeRow') }}
-              </button>
-              <button type="button" :disabled="block.rows[0].length >= 8" @click="changeTable(block, 'column', true)">
-                {{ t('documents.editor.addColumn') }}
-              </button>
-              <button type="button" :disabled="block.rows[0].length === 1" @click="changeTable(block, 'column', false)">
-                {{ t('documents.editor.removeColumn') }}
-              </button>
-            </div>
-          </div>
-
-          <label v-if="block.kind === 'image'" class="document-field">
-            {{ t('documents.editor.imageURL') }}
-            <input v-model="block.imageURL" type="url" required pattern="https://.+" maxlength="2048">
-          </label>
-        </article>
-      </fieldset>
-
-      <div class="document-actions editor-toolbar">
-        <select v-model="newKind" :aria-label="t('documents.editor.blockKind')" :disabled="pending">
-          <option v-for="kind in kinds" :key="kind" :value="kind">{{ t('documents.blocks.' + kind) }}</option>
-        </select>
-        <button type="button" :disabled="pending || blocks.length >= 80" @click="addBlock">
-          {{ t('documents.editor.add') }}
-        </button>
-        <button type="submit" class="document-primary" :disabled="pending || !dirty">
-          {{ t('documents.editor.save') }}
-        </button>
-        <button v-if="dirty" type="button" :disabled="pending" @click="reset">
-          {{ t('documents.editor.discard') }}
-        </button>
-      </div>
-    </form>
-
-    <div class="document-actions editor-toolbar">
-      <button type="button" :aria-expanded="showPreview" @click="showPreview = !showPreview">
-        {{ t(showPreview ? 'documents.editor.hidePreview' : 'documents.editor.preview') }}
-      </button>
-      <button type="button" :disabled="pending || dirty || !document.can_undo" @click="emit('change', { action: 'undo' })">
-        {{ t('documents.editor.undo') }}
-      </button>
-      <button type="button" :disabled="pending || dirty || !document.can_redo" @click="emit('change', { action: 'redo' })">
-        {{ t('documents.editor.redo') }}
-      </button>
-      <button type="button" :disabled="pending" @click="emit('history')">{{ t('documents.editor.history') }}</button>
-      <button v-if="anchors.length" type="button" @click="clear">
-        {{ t('documents.editor.clearSelection', { count: anchors.length }) }}
-      </button>
-    </div>
-
-    <DocumentPreview v-if="showPreview" :title="content.title" :blocks="content.blocks" :spec="spec" />
-
-    <label v-if="history.length" class="document-field">
-      {{ t('documents.editor.chooseRevision') }}
-      <select
-        :value="previous?.revision ?? ''"
+      <DownloadControls
+        :document="document"
+        kind="document"
         :disabled="pending"
-        @change="emit('viewRevision', Number(($event.target as HTMLSelectElement).value))"
+        :dirty="dirty"
+      />
+      <button
+        v-if="dirty"
+        type="button"
+        class="text-button"
+        :disabled="pending"
+        @click="discard"
       >
-        <option value="" disabled>{{ t('documents.editor.chooseRevision') }}</option>
-        <option v-for="item in history" :key="item.revision" :value="item.revision">
-          {{ t('documents.editor.revisionOption', { number: item.revision, title: item.title }) }}
-        </option>
-      </select>
-    </label>
-    <div v-if="previous" class="document-fields">
-      <DocumentPreview :title="previous.content.title" :blocks="previous.content.blocks" :spec="spec" />
+        {{ t('documents.editor.discard') }}
+      </button>
       <button
         type="button"
-        :disabled="pending || dirty || previous.revision === document.revision"
-        @click="previous && emit('change', { action: 'restore', target_revision: previous.revision })"
+        class="document-primary"
+        data-save
+        :disabled="pending || !dirty"
+        @click="save"
       >
-        {{ t('documents.editor.restore') }}
+        {{ t('documents.editor.save') }}
       </button>
+    </header>
+
+    <div class="editor-tabs">
+      <EditorTabs
+        v-model="tab"
+        :tabs="tabs"
+      />
+      <span
+        v-if="dirty"
+        class="save-indicator"
+        role="status"
+      >{{ t('documents.editor.unsaved') }}</span>
+      <span
+        v-else
+        class="caption"
+      >{{ t('editor.saveCreatesVersion') }}</span>
+      <span class="grow" />
+      <span
+        v-if="tab === 'edit'"
+        class="undo-tools"
+      >
+        <button
+          type="button"
+          class="icon-button"
+          :disabled="!undo.canUndo.value"
+          :title="t('editor.undo') + ' (Ctrl+Z)'"
+          :aria-label="t('editor.undo')"
+          @click="undo.undo()"
+        ><AppIcon name="undo" /></button>
+        <button
+          type="button"
+          class="icon-button"
+          :disabled="!undo.canRedo.value"
+          :title="t('editor.redo') + ' (Ctrl+Shift+Z)'"
+          :aria-label="t('editor.redo')"
+          @click="undo.redo()"
+        ><AppIcon name="redo" /></button>
+      </span>
+      <button
+        v-if="tab === 'edit'"
+        type="button"
+        class="small ai-toggle"
+        :class="{ on: aiOpen }"
+        :aria-pressed="aiOpen"
+        @click="aiOpen = !aiOpen"
+      >
+        <AppIcon name="sparkle" />{{ t('ai.title') }}
+      </button>
+    </div>
+
+    <div
+      v-if="tab === 'edit'"
+      class="editor-body"
+      :class="{ 'with-ai': aiOpen }"
+    >
+      <div class="editor-main">
+        <div
+          class="doc-toolbar"
+          role="toolbar"
+          :aria-label="t('documents.editor.insert')"
+        >
+          <span class="caption">{{ t('documents.editor.insert') }}</span>
+          <button
+            v-for="kind in kinds"
+            :key="kind"
+            type="button"
+            class="tool wide"
+            :disabled="pending || draft.blocks.length >= limits.blocks"
+            @click="addBlock(kind)"
+          >
+            <AppIcon name="plus" />{{ t('documents.blocks.' + kind) }}
+          </button>
+          <span
+            v-if="aiOpen"
+            class="caption grow doc-toolbar-hint"
+          >{{ t('documents.editor.selectionHint') }}</span>
+        </div>
+
+        <article
+          ref="page"
+          class="doc-page"
+          :class="{ selecting: aiOpen }"
+          :data-palette="spec?.palette"
+          :data-font="spec?.font"
+          @pointerdown="beginBoxSelect"
+          @pointermove="selection.moveRectangle"
+          @pointerup="selection.finishRectangle"
+          @pointercancel="selection.cancelRectangle"
+        >
+          <header class="doc-title">
+            <p class="doc-kicker">
+              {{ kicker }}
+            </p>
+            <input
+              v-model="draft.title"
+              class="doc-title-input"
+              required
+              maxlength="160"
+              :disabled="pending"
+              :aria-label="t('documents.editor.title')"
+            >
+          </header>
+
+          <section
+            v-for="(block, index) in draft.blocks"
+            :key="block.key"
+            class="doc-block"
+            :class="['doc-' + block.kind, { 'ai-selected': aiOpen && block.id && selected.has(block.id) }]"
+            :data-block-id="block.id"
+            :data-index="index"
+            @focusin="focused = index"
+          >
+            <label
+              v-if="aiOpen && block.id"
+              class="ai-select doc-select"
+              :title="t('documents.editor.select')"
+            >
+              <input
+                type="checkbox"
+                :checked="selected.has(block.id)"
+                :aria-label="t('documents.editor.select') + ' · ' + (index + 1)"
+                @change="block.id && selection.toggle(block.id)"
+              >
+            </label>
+            <div class="doc-block-tools">
+              <span class="doc-block-kind">{{ t('documents.blocks.' + block.kind) }}</span>
+              <button
+                type="button"
+                class="icon-button"
+                :title="t('documents.editor.up')"
+                :aria-label="t('documents.editor.up')"
+                :disabled="pending || index === 0"
+                @click="moveBlock(index, -1)"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                class="icon-button"
+                :title="t('documents.editor.down')"
+                :aria-label="t('documents.editor.down')"
+                :disabled="pending || index === draft.blocks.length - 1"
+                @click="moveBlock(index, 1)"
+              >
+                ↓
+              </button>
+              <button
+                type="button"
+                class="icon-button danger"
+                :title="t('documents.editor.remove')"
+                :aria-label="t('documents.editor.remove')"
+                :disabled="pending || draft.blocks.length === 1"
+                @click="removeBlock(index)"
+              >
+                ×
+              </button>
+            </div>
+
+            <input
+              v-if="block.kind === 'heading'"
+              v-model="block.text"
+              class="doc-heading"
+              maxlength="2500"
+              :disabled="pending"
+              :aria-label="t('documents.editor.blockText', { number: index + 1 })"
+              @input="edited(block)"
+              @select="captureText(block, $event)"
+            >
+            <textarea
+              v-else
+              v-model="block.text"
+              v-autosize
+              class="doc-text"
+              :class="{ 'doc-caption': block.kind !== 'paragraph' }"
+              rows="1"
+              maxlength="2500"
+              :disabled="pending"
+              :placeholder="t('documents.editor.placeholders.' + block.kind)"
+              :aria-label="t('documents.editor.blockText', { number: index + 1 })"
+              @input="edited(block); grow($event)"
+              @select="captureText(block, $event)"
+            />
+
+            <template v-if="block.kind === 'list'">
+              <ul class="doc-list">
+                <li
+                  v-for="(_, itemIndex) in block.items"
+                  :key="itemIndex"
+                >
+                  <textarea
+                    v-model="block.items[itemIndex]"
+                    v-autosize
+                    class="doc-text"
+                    rows="1"
+                    maxlength="400"
+                    :disabled="pending"
+                    :aria-label="t('documents.editor.item', { number: itemIndex + 1 })"
+                    @input="edited(block); grow($event)"
+                    @select="captureText(block, $event, 'items.' + itemIndex)"
+                  />
+                  <button
+                    type="button"
+                    class="icon-button"
+                    :aria-label="t('documents.editor.removeItem')"
+                    :disabled="pending || block.items.length === 1"
+                    @click="block.items.splice(itemIndex, 1)"
+                  >
+                    ×
+                  </button>
+                </li>
+              </ul>
+              <button
+                type="button"
+                class="doc-insert plain"
+                :disabled="pending || block.items.length >= limits.items"
+                @click="block.items.push('')"
+              >
+                <AppIcon name="plus" />{{ t('documents.editor.addItem') }}
+              </button>
+            </template>
+
+            <template v-if="block.kind === 'table'">
+              <div class="document-table doc-table">
+                <table>
+                  <tbody>
+                    <tr
+                      v-for="(row, rowIndex) in block.rows"
+                      :key="rowIndex"
+                    >
+                      <td
+                        v-for="(_, column) in row"
+                        :key="column"
+                      >
+                        <input
+                          v-model="row[column]"
+                          maxlength="400"
+                          :disabled="pending"
+                          :aria-label="t('documents.editor.cell', { row: rowIndex + 1, column: column + 1 })"
+                        >
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="doc-insert-row">
+                <button
+                  type="button"
+                  class="doc-insert plain"
+                  :disabled="pending || block.rows.length >= limits.rows"
+                  @click="changeTable(block, 'row', true)"
+                >
+                  <AppIcon name="plus" />{{ t('documents.editor.addRow') }}
+                </button>
+                <button
+                  type="button"
+                  class="doc-insert plain"
+                  :disabled="pending || block.rows.length === 1"
+                  @click="changeTable(block, 'row', false)"
+                >
+                  {{ t('documents.editor.removeRow') }}
+                </button>
+                <button
+                  type="button"
+                  class="doc-insert plain"
+                  :disabled="pending || block.rows[0].length >= limits.columns"
+                  @click="changeTable(block, 'column', true)"
+                >
+                  <AppIcon name="plus" />{{ t('documents.editor.addColumn') }}
+                </button>
+                <button
+                  type="button"
+                  class="doc-insert plain"
+                  :disabled="pending || block.rows[0].length === 1"
+                  @click="changeTable(block, 'column', false)"
+                >
+                  {{ t('documents.editor.removeColumn') }}
+                </button>
+              </div>
+            </template>
+
+            <figure
+              v-if="block.kind === 'image'"
+              class="doc-figure"
+            >
+              <img
+                v-if="block.imageURL.startsWith('https://')"
+                :src="block.imageURL"
+                :alt="block.text"
+                referrerpolicy="no-referrer"
+                loading="lazy"
+              >
+              <span
+                v-else
+                class="doc-figure-empty"
+              >{{ t('documents.editor.imageEmpty') }}</span>
+              <label class="doc-figure-url">
+                {{ t('documents.editor.imageURL') }}
+                <input
+                  v-model="block.imageURL"
+                  type="url"
+                  required
+                  pattern="https://.+"
+                  maxlength="2048"
+                  :disabled="pending"
+                >
+              </label>
+            </figure>
+          </section>
+          <div
+            v-if="rectangle"
+            class="selection-box"
+            :style="{ left: rectangle.left + 'px', top: rectangle.top + 'px', width: rectangle.width + 'px', height: rectangle.height + 'px' }"
+          />
+        </article>
+      </div>
+
+      <AIEditPanel
+        v-if="aiOpen"
+        :labels="labels"
+        :dirty="dirty"
+        :pending="pending"
+        :proposal="proposal"
+        :revision="document.revision"
+        :describe="describe"
+        @propose="propose"
+        @accept="emit('accept')"
+        @reject="emit('reject')"
+        @clear="selection.clear"
+        @close="aiOpen = false"
+      >
+        <template #hint>
+          {{ t('documents.editor.aiHint') }}
+        </template>
+      </AIEditPanel>
+    </div>
+
+    <div
+      v-else-if="tab === 'preview'"
+      class="editor-body padded"
+    >
+      <DocumentPreview
+        :title="content.title"
+        :blocks="content.blocks"
+        :spec="spec"
+      />
+    </div>
+
+    <div
+      v-else
+      class="editor-body padded"
+    >
+      <RevisionPanel
+        :history="history"
+        :current="document.revision"
+        :selected="previous?.revision"
+        :pending="pending"
+        :dirty="dirty"
+        :can-undo="document.can_undo"
+        :can-redo="document.can_redo"
+        @load="emit('history')"
+        @view="emit('viewRevision', $event)"
+        @restore="emit('change', { action: 'restore', target_revision: $event })"
+        @undo="emit('change', { action: 'undo' })"
+        @redo="emit('change', { action: 'redo' })"
+      >
+        <DocumentPreview
+          v-if="previous"
+          :title="previous.content.title"
+          :blocks="previous.content.blocks"
+          :spec="spec"
+        />
+      </RevisionPanel>
     </div>
   </section>
 </template>

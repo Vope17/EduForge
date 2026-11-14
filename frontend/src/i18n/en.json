@@ -178,7 +178,21 @@
       "chooseRevision": "Choose a revision to view",
       "revisionOption": "Revision {number} · {title}",
       "restore": "Restore this revision",
-      "clearSelection": "Clear {count} selections"
+      "clearSelection": "Clear {count} selections",
+      "discardConfirm": "Discard all unsaved edits?",
+      "newHeading": "New heading",
+      "insert": "Insert",
+      "selectionHint": "Tick blocks, highlight text, or drag a box from the page margin.",
+      "blockLabel": "Block {number} ({kind})",
+      "imageEmpty": "Enter an HTTPS image address to show the image",
+      "aiHint": "Tick the boxes on the left, highlight text, or drag a box from the page margin to choose what to change.",
+      "placeholders": {
+        "heading": "Heading",
+        "paragraph": "Type the paragraph…",
+        "list": "List introduction (optional)",
+        "table": "Table caption (optional)",
+        "image": "Image caption"
+      }
     },
     "errors": {
       "plan_permission": "Reconnect ChatGPT and allow usage of your plan.",
@@ -333,5 +347,52 @@
     "failed": "Download failed. Please try again.",
     "assetsFailed": "Export images or fonts could not be loaded. Check image URLs or use uploaded images.",
     "layoutFailed": "Slide text does not fit. Shorten it or split it across more slides before downloading."
+  },
+  "editor": {
+    "tabs": {
+      "edit": "Edit",
+      "preview": "Preview",
+      "history": "Versions"
+    },
+    "saveCreatesVersion": "Each save creates a new version",
+    "undo": "Undo",
+    "redo": "Redo"
+  },
+  "ai": {
+    "title": "AI edit",
+    "close": "Close AI edit",
+    "selected": "{count} selected",
+    "clear": "Clear selection",
+    "saveFirst": "Save your manual edits before asking AI for changes.",
+    "quick": {
+      "concise": "Shorter",
+      "conciseText": "Make the selected text more concise and keep the key points.",
+      "casual": "Conversational",
+      "casualText": "Make the selected text more conversational for explaining in class.",
+      "formal": "More formal",
+      "formalText": "Make the selected text more formal and precise.",
+      "example": "Add an example",
+      "exampleText": "Add an example from students’ everyday life to the selected text."
+    },
+    "instruction": "Instruction for the selected parts only",
+    "working": "AI is editing…",
+    "propose": "Preview AI edit",
+    "review": "Review the changes",
+    "before": "Before",
+    "after": "After",
+    "stale": "This suggestion is for an older version. Ask again.",
+    "accept": "Accept as new version",
+    "reject": "Discard suggestion",
+    "partialText": "part of the text"
+  },
+  "revisions": {
+    "title": "Versions",
+    "current": "Current: version {number}",
+    "saveFirst": "Save or discard your edits before switching versions.",
+    "undo": "Back one version",
+    "redo": "Forward one version",
+    "number": "Version {number}",
+    "restore": "Restore this version",
+    "choose": "Choose a version on the left to view it."
   }
 }
