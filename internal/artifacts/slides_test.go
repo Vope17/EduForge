@@ -31,7 +31,7 @@ func TestSlidePointsAreShortAndAtMostFive(t *testing.T) {
 }
 
 func TestDeckIsFigureFirstWithEditableBoxes(t *testing.T) {
-	k := domain.Knowledge{Title: "user title", Units: []domain.Unit{{ID: "s:p1", SourceName: "AIDA paper.pdf"}}, Images: []domain.Image{
+	k := domain.Knowledge{Title: "user title", Units: []domain.Unit{{ID: "s:p1", SourceName: "AIDA lesson.pdf"}}, Images: []domain.Image{
 		{Path: "f1", Citation: "s:p1", Caption: "Figure 1: workflow"}, {Path: "f2", Citation: "s:p1", Caption: "Figure 2: results"},
 	}}
 	deck := BuildDeck([]domain.Section{
@@ -41,8 +41,8 @@ func TestDeckIsFigureFirstWithEditableBoxes(t *testing.T) {
 	if len(deck) != 4 {
 		t.Fatalf("expected cover, method (both figures), limits, closing: %#v", deck)
 	}
-	if cover := deck[0]; slideKind(cover) != "display" || cover.Layout[1].Text != "AIDA paper" || !strings.Contains(cover.Notes, "AIDA paper") {
-		t.Fatalf("cover should show the paper name with an opening script: %#v", cover)
+	if cover := deck[0]; slideKind(cover) != "display" || cover.Layout[1].Text != "AIDA lesson" || !strings.Contains(cover.Notes, "AIDA lesson") {
+		t.Fatalf("cover should show the lesson name with an opening script: %#v", cover)
 	}
 	method := deck[1].Layout
 	if len(method) != 5 || method[1].Path != "f1" || method[3].Path != "f2" || method[3].ID == method[1].ID || deck[1].Notes != "explain" {
@@ -101,7 +101,7 @@ func TestPPTXRendersLayoutBoxesAsShapesAndPictures(t *testing.T) {
 		},
 	}, {
 		Title: "Cover", Notes: "**Opening**\nhello",
-		Layout: []domain.Element{{ID: "title", Kind: "text", Role: "display", X: .1, Y: .3, W: .8, H: .3, Text: "Paper", Size: 36}},
+		Layout: []domain.Element{{ID: "title", Kind: "text", Role: "display", X: .1, Y: .3, W: .8, H: .3, Text: "Lesson", Size: 36}},
 	}}}
 	b, err := PPTX(s, a, domain.Knowledge{})
 	if err != nil {
@@ -150,7 +150,7 @@ func TestReaderHasCaptionsAndReferencesButNoGlossaryOrSourceIndex(t *testing.T) 
 		t.Fatal(err)
 	}
 	defer s.Close()
-	k := domain.Knowledge{Title: "user title", Units: []domain.Unit{{ID: "s:p1", SourceName: "AIDA paper.pdf", Text: "raw page text"}},
+	k := domain.Knowledge{Title: "user title", Units: []domain.Unit{{ID: "s:p1", SourceName: "AIDA lesson.pdf", Text: "raw page text"}},
 		Terms: []domain.Term{{Original: "Knowledge Graph", Abbreviation: "KG"}}}
 	a := domain.Artifact{Type: "A", Language: "zh-TW", Check: domain.Check{Status: "draft"}, Style: domain.StyleSnapshot{Resolved: map[string]domain.Style{}},
 		Sections: []domain.Section{{Title: "方法", Body: "內容", Citations: []string{"s:p1"}, Figures: []string{}}}}
@@ -167,11 +167,11 @@ func TestReaderHasCaptionsAndReferencesButNoGlossaryOrSourceIndex(t *testing.T) 
 	if !strings.Contains(html, `<span class="num">I.</span>方法`) || !strings.Contains(html, "論文導讀") {
 		t.Fatal("reader sections should be numbered under a titled header")
 	}
-	if !strings.Contains(html, "<h2>引用</h2><ol><li>AIDA paper</li>") {
-		t.Fatal("references section with the paper name missing")
+	if !strings.Contains(html, "<h2>引用</h2><ol><li>AIDA lesson</li>") {
+		t.Fatal("references section with the lesson name missing")
 	}
 	doc := string(readerDocument(s, a, k))
-	if strings.Contains(doc, "Knowledge Graph") || strings.Contains(doc, "s:p1") || !strings.Contains(doc, "[1] AIDA paper") || !strings.Contains(doc, "I.  方法") {
+	if strings.Contains(doc, "Knowledge Graph") || strings.Contains(doc, "s:p1") || !strings.Contains(doc, "[1] AIDA lesson") || !strings.Contains(doc, "I.  方法") {
 		t.Fatal("PDF document should list references only")
 	}
 }

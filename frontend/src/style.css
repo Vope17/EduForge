@@ -91,14 +91,14 @@ h3 { font-size: 15px; font-weight: 650; margin: 0 0 10px }
 
 .sidebar-label, .eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: var(--brand-ink) }
 .sidebar-label { color: var(--side-faint); letter-spacing: .08em; margin: 0 6px 8px }
-.sidebar select.project-picker {
+.sidebar select.course-picker {
   background: var(--side-bg-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a9c4b8' stroke-width='1.6' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3'/%3E%3C/svg%3E") no-repeat right 12px center;
   color: #f1f4ec; border: 1px solid #2c5a51; border-radius: var(--r-sm);
   padding: 9px 32px 9px 12px; font-size: 13px; appearance: none; min-height: 40px;
   transition: border-color .15s var(--ease);
 }
-.sidebar select.project-picker:hover, .sidebar select.project-picker:focus { border-color: #4d8a7b; box-shadow: none }
-.project-picker option { color: var(--ink); background: #fff }
+.sidebar select.course-picker:hover, .sidebar select.course-picker:focus { border-color: #4d8a7b; box-shadow: none }
+.course-picker option { color: var(--ink); background: #fff }
 .sidebar-bottom { margin-top: auto; padding: 18px 6px 0; border-top: 1px solid #ffffff12; color: var(--side-faint); font-size: 11px; line-height: 1.9 }
 .language-switch { display: inline-flex; gap: 2px; padding: 3px; background: #0a2622; border: 1px solid #ffffff14; border-radius: 8px }
 .language-switch button { padding: 4px 14px; font-size: 12px; font-weight: 600; color: var(--side-faint); border-radius: 6px; transition: background .15s, color .15s }
@@ -157,23 +157,23 @@ h3 { font-size: 15px; font-weight: 650; margin: 0 0 10px }
 .metrics-strip strong { font-family: var(--font-serif); font-size: 34px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; color: var(--ink) }
 .metrics-strip span { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .02em }
 
-/* Paper cards */
-.paper-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 28px }
-.paper-card {
+/* Lesson cards */
+.lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 28px }
+.lesson-card {
   border: 1px solid var(--line); background: var(--surface); padding: 20px 22px 16px; border-radius: var(--r-lg);
   min-height: 220px; display: flex; flex-direction: column; box-shadow: var(--shadow-sm);
   transition: border-color .18s var(--ease), box-shadow .18s var(--ease), transform .18s var(--ease);
 }
-.paper-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow); transform: translateY(-2px) }
-.paper-card.selected { border-color: var(--brand); box-shadow: 0 0 0 3px #0f5f521f, var(--shadow) }
-.paper-card-top, .paper-card-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px }
-.paper-card-top { margin-bottom: 14px }
-.paper-number { font-family: var(--font-mono); color: var(--faint); font-size: 12px; letter-spacing: 1px }
-.paper-card h2 { font-family: var(--font-serif); font-size: 21px; line-height: 1.4; margin-bottom: 14px; font-weight: 600 }
-.paper-title { text-align: left; padding: 0; color: var(--ink); transition: color .15s }
-.paper-title:hover { color: var(--brand) }
-.paper-card-actions { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line); gap: 12px }
-.paper-card-actions .text-button { font-size: 12px }
+.lesson-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow); transform: translateY(-2px) }
+.lesson-card.selected { border-color: var(--brand); box-shadow: 0 0 0 3px #0f5f521f, var(--shadow) }
+.lesson-card-top, .lesson-card-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px }
+.lesson-card-top { margin-bottom: 14px }
+.lesson-number { font-family: var(--font-mono); color: var(--faint); font-size: 12px; letter-spacing: 1px }
+.lesson-card h2 { font-family: var(--font-serif); font-size: 21px; line-height: 1.4; margin-bottom: 14px; font-weight: 600 }
+.lesson-title { text-align: left; padding: 0; color: var(--ink); transition: color .15s }
+.lesson-title:hover { color: var(--brand) }
+.lesson-card-actions { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line); gap: 12px }
+.lesson-card-actions .text-button { font-size: 12px }
 
 /* Pills */
 .pill {
@@ -401,8 +401,8 @@ pre { padding: 16px 18px; background: #f3f5f0; border: 1px solid var(--line); bo
 .run-status-grid strong { font-size: 16px; color: var(--ink); overflow-wrap: anywhere }
 
 /* Footer / feedback */
-.project-footer { display: flex; align-items: center; gap: 22px; border-top: 1px solid var(--line); margin: auto 44px 0; padding: 20px 0 }
-.project-footer label { margin-right: auto }
+.course-footer { display: flex; align-items: center; gap: 22px; border-top: 1px solid var(--line); margin: auto 44px 0; padding: 20px 0 }
+.course-footer label { margin-right: auto }
 .import-row { padding: 0 44px 24px }
 .error-banner { margin: 16px 44px 0; padding: 12px 14px 12px 18px; background: var(--danger-soft); border: 1px solid var(--danger-line); border-left: 4px solid var(--danger); border-radius: var(--r); font-size: 14px; color: #8e3a2f; display: flex; justify-content: space-between; align-items: center; gap: 20px; animation: page-in .2s var(--ease) both }
 .error-banner button { font-size: 20px; line-height: 1; width: 28px; height: 28px; border-radius: 6px; color: #8e3a2f }
@@ -458,33 +458,33 @@ pre { padding: 16px 18px; background: #f3f5f0; border: 1px solid var(--line); bo
 .subpage { animation: page-in .22s var(--ease) both }
 .page-heading + .subnav-wrap { margin-top: -10px }
 
-/* ---------- Shell v2: sidebar paper list, top bar, task drawer ---------- */
+/* ---------- Shell v2: sidebar lesson list, top bar, task drawer ---------- */
 .icon { width: 18px; height: 18px; flex-shrink: 0 }
 .primary .icon, .secondary .icon, .text-button .icon, .file-picker .icon { width: 16px; height: 16px }
-.project-row { display: flex; gap: 6px; align-items: center }
-.project-row .project-picker { flex: 1; min-width: 0 }
+.course-row { display: flex; gap: 6px; align-items: center }
+.course-row .course-picker { flex: 1; min-width: 0 }
 .side-icon-button { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: var(--r-sm); color: var(--side-ink); background: var(--side-bg-2); border: 1px solid #2c5a51; transition: background .15s, color .15s }
 .side-icon-button:hover { background: #21564d; color: #fff }
-.papers-label { display: flex; align-items: center; justify-content: space-between; margin-top: 22px }
+.lessons-label { display: flex; align-items: center; justify-content: space-between; margin-top: 22px }
 .side-count { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; background: #ffffff14; color: var(--side-ink); letter-spacing: 0 }
-.paper-nav { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; min-height: 0; flex: 1 1 auto; margin: 0 -6px; padding: 0 6px; scrollbar-width: thin; scrollbar-color: #ffffff22 transparent }
-.paper-link { display: flex; align-items: center; gap: 8px; padding: 0 0 0 8px; border-radius: 8px; transition: background .15s }
-.paper-link:hover { background: #ffffff0d }
-.paper-link.active { background: #f1f5e9; box-shadow: 0 2px 10px rgb(0 0 0 / .18) }
-.paper-link input[type=checkbox] { width: 14px; height: 14px; opacity: .55; accent-color: var(--lime) }
-.paper-link:hover input[type=checkbox], .paper-link.checked input[type=checkbox] { opacity: 1 }
-.paper-link-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; padding: 9px 10px 9px 0; text-align: left; color: var(--side-ink) }
-.paper-link.active .paper-link-main { color: #0f3a33 }
-.paper-link-title { font-size: 13.5px; font-weight: 550; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical }
+.lesson-nav { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; min-height: 0; flex: 1 1 auto; margin: 0 -6px; padding: 0 6px; scrollbar-width: thin; scrollbar-color: #ffffff22 transparent }
+.lesson-link { display: flex; align-items: center; gap: 8px; padding: 0 0 0 8px; border-radius: 8px; transition: background .15s }
+.lesson-link:hover { background: #ffffff0d }
+.lesson-link.active { background: #f1f5e9; box-shadow: 0 2px 10px rgb(0 0 0 / .18) }
+.lesson-link input[type=checkbox] { width: 14px; height: 14px; opacity: .55; accent-color: var(--lime) }
+.lesson-link:hover input[type=checkbox], .lesson-link.checked input[type=checkbox] { opacity: 1 }
+.lesson-link-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; padding: 9px 10px 9px 0; text-align: left; color: var(--side-ink) }
+.lesson-link.active .lesson-link-main { color: #0f3a33 }
+.lesson-link-title { font-size: 13.5px; font-weight: 550; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical }
 .step-dots { display: flex; gap: 4px }
 .step-dots i, .step-mini i { width: 18px; height: 4px; border-radius: 999px; background: #ffffff24 }
 .step-dots i.done { background: var(--lime) }
 .step-dots i.action { background: #f0c46a }
 .step-dots i.running { background: #6fd3b0; animation: blink 1.2s ease-in-out infinite }
-.paper-link.active .step-dots i { background: #d4ddd0 }
-.paper-link.active .step-dots i.done { background: var(--brand) }
-.paper-link.active .step-dots i.action { background: #d29a2c }
-.paper-link.active .step-dots i.running { background: #2fa27e }
+.lesson-link.active .step-dots i { background: #d4ddd0 }
+.lesson-link.active .step-dots i.done { background: var(--brand) }
+.lesson-link.active .step-dots i.action { background: #d29a2c }
+.lesson-link.active .step-dots i.running { background: #2fa27e }
 @keyframes blink { 50% { opacity: .35 } }
 .side-empty { font-size: 12px; color: var(--side-faint); padding: 8px }
 .sidebar-new { display: flex; align-items: center; gap: 8px; color: #a9c4b8; text-align: left; font-size: 13px; margin: 8px 0 0; padding: 8px; border-radius: var(--r-sm); border: 1px dashed #ffffff22; transition: background .15s, color .15s }
@@ -530,7 +530,7 @@ pre { padding: 16px 18px; background: #f3f5f0; border: 1px solid var(--line); bo
 .drawer .task-row { margin: 0; padding: 14px 8px }
 .text-button.inline { display: inline; padding: 0; font-size: inherit }
 
-/* Project home */
+/* Course home */
 .onboarding { background: linear-gradient(160deg, #eef6f0, var(--surface) 70%) }
 .onboard-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px }
 .onboard-list li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line) }
@@ -549,12 +549,12 @@ pre { padding: 16px 18px; background: #f3f5f0; border: 1px solid var(--line); bo
 .step-mini:not(.labelled) { margin: 0; flex: 0 0 auto }
 .step-mini:not(.labelled) li { flex: 0 0 auto }
 .step-mini:not(.labelled) i { width: 16px; height: 4px }
-.paper-card { min-height: 0 }
+.lesson-card { min-height: 0 }
 
-/* Paper workspace */
-.paper-head { display: flex; gap: 20px; align-items: flex-start; margin-bottom: 22px }
-.paper-head h1 { margin-bottom: 12px }
-.paper-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px }
+/* Lesson workspace */
+.lesson-head { display: flex; gap: 20px; align-items: flex-start; margin-bottom: 22px }
+.lesson-head h1 { margin-bottom: 12px }
+.lesson-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px }
 .inline-field { flex-direction: row; align-items: center; gap: 8px; margin: 0; font-size: 12px; color: var(--muted) }
 .inline-field input { width: 160px; padding: 4px 8px; font-size: 13px; background: transparent; border-color: transparent; border-bottom: 1px dashed var(--line-strong); border-radius: 0 }
 .inline-field.wide input { width: 260px }
@@ -610,12 +610,12 @@ pre { padding: 16px 18px; background: #f3f5f0; border: 1px solid var(--line); bo
 .task-list .task-row:first-child { border-top: 0 }
 .modal-divider { display: flex; align-items: center; gap: 12px; margin: 18px 0 8px; color: var(--faint); font-size: 12px }
 .modal-divider::before, .modal-divider::after { content: ''; flex: 1; height: 1px; background: var(--line) }
-.batch-papers { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px }
-.batch-paper { display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-sm) }
-.batch-paper .icon-button { width: 26px; height: 26px; font-size: 16px }
+.batch-lessons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px }
+.batch-lesson { display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-sm) }
+.batch-lesson .icon-button { width: 26px; height: 26px; font-size: 16px }
 .settings-section > .lede { margin-bottom: 16px }
 
-.paper-view .subnav-wrap { position: static; margin: 0 0 18px; padding: 0; border: 0; background: none; backdrop-filter: none }
+.lesson-view .subnav-wrap { position: static; margin: 0 0 18px; padding: 0; border: 0; background: none; backdrop-filter: none }
 .nav-backdrop { display: none }
 .topbar { gap: 12px }
 
@@ -785,7 +785,7 @@ body.no-scroll { overflow: hidden }
   .subnav-context { display: none }
   .metrics-strip { grid-template-columns: repeat(2, 1fr) }
   .split-layout { grid-template-columns: 1fr }
-  .project-footer, .error-banner { margin-left: 28px; margin-right: 28px }
+  .course-footer, .error-banner { margin-left: 28px; margin-right: 28px }
   .import-row { padding-left: 28px }
   .panel { padding: 22px }
   .task-row, .request-row { flex-wrap: wrap }
@@ -809,7 +809,7 @@ body.no-scroll { overflow: hidden }
   .step-state { display: none }
   .step-name { font-size: 12px }
   .step-name small { display: none }
-  .paper-head h1 { font-size: 24px }
+  .lesson-head h1 { font-size: 24px }
   .inline-field { flex: 1 1 100%; flex-direction: column; align-items: stretch; gap: 2px }
   .inline-field input, .inline-field.wide input { width: 100% }
   .dropzone { flex-direction: column; gap: 10px }
@@ -838,7 +838,7 @@ body.no-scroll { overflow: hidden }
   .subnav { width: 100% }
   .subnav button { padding: 8px 10px; gap: 6px; font-size: 12px; flex: 1 0 auto; justify-content: center }
   .subnav-icon { width: 17px; height: 17px }
-  .paper-grid { grid-template-columns: 1fr }
+  .lesson-grid { grid-template-columns: 1fr }
   .panel { padding: 18px 16px; border-radius: var(--r) }
   .section-heading { flex-wrap: wrap; gap: 12px }
   .section-heading > select { max-width: 100% }
@@ -852,8 +852,8 @@ body.no-scroll { overflow: hidden }
   .preview-grid { grid-template-columns: 1fr }
   .source-row { gap: 10px }
   .source-row > .pill { display: none }
-  .project-footer { margin: 0 16px; gap: 14px; flex-wrap: wrap }
-  .project-footer label { width: 100%; margin: 0 }
+  .course-footer { margin: 0 16px; gap: 14px; flex-wrap: wrap }
+  .course-footer label { width: 100%; margin: 0 }
   .import-row { padding-left: 16px }
   .error-banner { margin: 12px 16px 0 }
   .modal-backdrop { padding: 12px; align-items: flex-end }
@@ -905,40 +905,40 @@ body.no-scroll { overflow: hidden }
 .chat-input { display: flex; gap: 10px; align-items: flex-end; padding: 12px 16px; border-top: 1px solid var(--line); background: var(--surface) }
 .chat-input textarea { flex: 1; resize: none; min-height: 48px; max-height: 180px; font-size: 14.5px }
 
-/* Research library folders */
-.papers-label { justify-content: flex-start; gap: 8px }
+/* Research library chapters */
+.lessons-label { justify-content: flex-start; gap: 8px }
 .push-right { margin-left: auto }
 .side-icon-button.small { width: 26px; height: 26px; border-radius: 6px; background: transparent; border-color: transparent; color: var(--side-faint) }
 .side-icon-button.small:hover { background: #ffffff14; color: #fff }
 .side-icon-button.small svg { width: 15px; height: 15px }
-.folder-row { display: flex; align-items: center; gap: 2px; margin-top: 6px; border-radius: 8px; border: 1px dashed transparent; transition: background .15s, border-color .15s }
-.folder-row.drop-target { border-color: var(--lime); background: #cfe0a31f }
-.folder-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 4px; color: var(--side-ink); font-size: 12.5px; font-weight: 650; text-align: left }
-.folder-toggle svg { width: 15px; height: 15px; flex: none; color: var(--side-faint) }
-.folder-caret { display: inline-block; width: 12px; color: var(--side-faint); transition: transform .15s }
-.folder-caret.closed { transform: rotate(-90deg) }
-.folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-.folder-actions { display: flex; opacity: 0; transition: opacity .15s }
-.folder-row:hover .folder-actions, .folder-row:focus-within .folder-actions { opacity: 1 }
-.paper-link.in-folder { margin-left: 14px }
-.paper-link[draggable=true] { cursor: grab }
-.paper-link.dragged { opacity: .45 }
-.folder-empty { margin: 2px 0 4px 34px; font-size: 11.5px; color: var(--side-faint) }
+.chapter-row { display: flex; align-items: center; gap: 2px; margin-top: 6px; border-radius: 8px; border: 1px dashed transparent; transition: background .15s, border-color .15s }
+.chapter-row.drop-target { border-color: var(--lime); background: #cfe0a31f }
+.chapter-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 4px; color: var(--side-ink); font-size: 12.5px; font-weight: 650; text-align: left }
+.chapter-toggle svg { width: 15px; height: 15px; flex: none; color: var(--side-faint) }
+.chapter-caret { display: inline-block; width: 12px; color: var(--side-faint); transition: transform .15s }
+.chapter-caret.closed { transform: rotate(-90deg) }
+.chapter-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.chapter-actions { display: flex; opacity: 0; transition: opacity .15s }
+.chapter-row:hover .chapter-actions, .chapter-row:focus-within .chapter-actions { opacity: 1 }
+.lesson-link.in-chapter { margin-left: 14px }
+.lesson-link[draggable=true] { cursor: grab }
+.lesson-link.dragged { opacity: .45 }
+.chapter-empty { margin: 2px 0 4px 34px; font-size: 11.5px; color: var(--side-faint) }
 .read-mark { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 6px; border-radius: 999px; background: var(--ok); color: #fff; vertical-align: -2px; flex: none }
 .read-mark svg { width: 11px; height: 11px; stroke-width: 3 }
-.paper-link .read-mark { background: var(--lime); color: var(--side-bg) }
-.paper-link.active .read-mark { background: var(--ok); color: #fff }
-.paper-head h1 .read-mark { width: 24px; height: 24px; margin-right: 10px; vertical-align: 2px }
-.paper-head h1 .read-mark svg { width: 15px; height: 15px }
-.paper-folder + .paper-folder { margin-top: 4px }
-.folder-heading { display: flex; align-items: center; gap: 8px; font-size: 15px; margin: 0 0 12px; color: var(--ink-2) }
-.folder-heading svg { width: 18px; height: 18px; color: var(--muted) }
-.folder-heading .count { margin-left: 0 }
-.folder-select { max-width: 55%; padding: 4px 8px; font-size: 12px }
+.lesson-link .read-mark { background: var(--lime); color: var(--side-bg) }
+.lesson-link.active .read-mark { background: var(--ok); color: #fff }
+.lesson-head h1 .read-mark { width: 24px; height: 24px; margin-right: 10px; vertical-align: 2px }
+.lesson-head h1 .read-mark svg { width: 15px; height: 15px }
+.lesson-chapter + .lesson-chapter { margin-top: 4px }
+.chapter-heading { display: flex; align-items: center; gap: 8px; font-size: 15px; margin: 0 0 12px; color: var(--ink-2) }
+.chapter-heading svg { width: 18px; height: 18px; color: var(--muted) }
+.chapter-heading .count { margin-left: 0 }
+.chapter-select { max-width: 55%; padding: 4px 8px; font-size: 12px }
 .advanced-settings { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 4px }
 .advanced-settings summary { cursor: pointer; font-weight: 650; color: var(--ink-2); font-size: 14px }
 .advanced-settings .provider-form { border-top: 0; padding-bottom: 4px }
-@media (hover: none) { .folder-actions { opacity: 1 } }
+@media (hover: none) { .chapter-actions { opacity: 1 } }
 
 /* AI editing */
 .ai-toggle { margin-left: auto }

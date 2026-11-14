@@ -33,7 +33,7 @@ func (s *Store) CommitTasks(ctx context.Context, owner, id string, expected int,
 		r.Version = 1
 		r.Created = stamp
 		r.Updated = stamp
-		_, err = tx.ExecContext(ctx, "INSERT INTO records VALUES(?,?,?,?,?,?,?,?,?,?)", r.ID, r.Owner, r.Kind, r.Parent, nullable(r.Project), nullable(r.Paper), r.Version, string(r.Data), r.Created, r.Updated)
+		_, err = tx.ExecContext(ctx, "INSERT INTO records VALUES(?,?,?,?,?,?,?,?,?,?)", r.ID, r.Owner, r.Kind, r.Parent, nullable(r.Course), nullable(r.Lesson), r.Version, string(r.Data), r.Created, r.Updated)
 		if err != nil {
 			return nil, err
 		}

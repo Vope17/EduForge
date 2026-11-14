@@ -21,7 +21,7 @@ import (
 type Manifest struct {
 	Schema           int             `json:"schema"`
 	Exported         string          `json:"exported_at"`
-	Project          string          `json:"project_id"`
+	Course           string          `json:"course_id"`
 	Records          []domain.Record `json:"records"`
 	IncludesPersonal bool            `json:"includes_personal"`
 }
@@ -97,8 +97,8 @@ func BlobReferences(r domain.Record) map[string]bool {
 	case "task":
 		value, _ := domain.Decode[domain.Task](r.Data)
 		addStyles(value.Style.Resolved)
-	case "project":
-		value, _ := domain.Decode[domain.Project](r.Data)
+	case "course":
+		value, _ := domain.Decode[domain.Course](r.Data)
 		addStyles(value.Style)
 	case "feedback":
 		value, _ := domain.Decode[domain.Feedback](r.Data)
@@ -156,12 +156,12 @@ func sanitizeExport(r domain.Record) domain.Record {
 	r.Data = domain.Encode(obj)
 	return r
 }
-func (a *App) Export(ctx context.Context, owner, project string, personal bool) ([]byte, error) {
-	p, err := a.Store.Get(ctx, owner, project, "project")
+func (a *App) Export(ctx context.Context, owner, course string, personal bool) ([]byte, error) {
+	p, err := a.Store.Get(ctx, owner, course, "course")
 	if err != nil {
 		return nil, err
 	}
-	records, err := a.Store.List(ctx, owner, store.Filter{Project: project})
+	records, err := a.Store.List(ctx, owner, store.Filter{Course: course})
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func (a *App) Export(ctx context.Context, owner, project string, personal bool) 
 			records = append(records, items...)
 		}
 	}
-	manifest := Manifest{Schema: 1, Exported: domain.Now(), Project: project, Records: []domain.Record{}, IncludesPersonal: personal}
+	manifest := Manifest{Schema: 1, Exported: domain.Now(), Course: course, Records: []domain.Record{}, IncludesPersonal: personal}
 	refs := map[string]bool{}
 	for _, r := range records {
 		if r.Kind == "provider" || r.Kind == "attempt" {
@@ -258,7 +258,7 @@ func remap(value any, ids map[string]string) any {
 func (a *App) Import(ctx context.Context, owner string, b []byte, personal bool) (domain.Record, error) {
 	archive, err := zip.NewReader(bytes.NewReader(b), int64(len(b)))
 	if err != nil {
-		return domain.Record{}, errors.New("invalid_project_archive")
+		return domain.Record{}, errors.New("invalid_course_archive")
 	}
 	if len(archive.File) > 10000 {
 		return domain.Record{}, errors.New("archive_limits_exceeded")
@@ -292,11 +292,11 @@ func (a *App) Import(ctx context.Context, owner string, b []byte, personal bool)
 	}
 	var manifest Manifest
 	if json.Unmarshal(entries["manifest.json"], &manifest) != nil || manifest.Schema != 1 {
-		return domain.Record{}, errors.New("unsupported_project_schema")
+		return domain.Record{}, errors.New("unsupported_course_schema")
 	}
 	ids := map[string]string{}
 	records := []domain.Record{}
-	allowed := map[string]bool{"project": true, "paper": true, "source": true, "knowledge": true, "feedback": true, "request": true, "preview": true, "task": true, "step": true, "artifact": true, "plan": true, "run": true, "comparison": true, "event": true, "plan_chat": true, "folder": true}
+	allowed := map[string]bool{"course": true, "lesson": true, "source": true, "knowledge": true, "feedback": true, "request": true, "preview": true, "task": true, "step": true, "artifact": true, "plan": true, "run": true, "comparison": true, "event": true, "plan_chat": true, "chapter": true}
 	if personal {
 		for _, kind := range []string{"profile", "profile_version", "reading", "preference", "template"} {
 			allowed[kind] = true
@@ -315,9 +315,9 @@ func (a *App) Import(ctx context.Context, owner string, b []byte, personal bool)
 		ids[r.ID] = domain.ID()
 		records = append(records, r)
 	}
-	project := ids[manifest.Project]
-	if project == "" {
-		return domain.Record{}, errors.New("project_record_missing")
+	course := ids[manifest.Course]
+	if course == "" {
+		return domain.Record{}, errors.New("course_record_missing")
 	}
 	refs := map[string]bool{}
 	for _, r := range records {
@@ -345,7 +345,7 @@ func (a *App) Import(ctx context.Context, owner string, b []byte, personal bool)
 			return domain.Record{}, errors.New("archive_blob_invalid")
 		}
 	}
-	// Validate and insert all records in a transaction; failed imports leave no partial project.
+	// Validate and insert all records in a transaction; failed imports leave no partial course.
 	tx, err := a.Store.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return domain.Record{}, err
@@ -364,11 +364,11 @@ func (a *App) Import(ctx context.Context, owner string, b []byte, personal bool)
 				next = append(next, r)
 				continue
 			}
-			if r.Project != "" && !inserted[r.Project] {
+			if r.Course != "" && !inserted[r.Course] {
 				next = append(next, r)
 				continue
 			}
-			if r.Paper != "" && !inserted[r.Paper] {
+			if r.Lesson != "" && !inserted[r.Lesson] {
 				next = append(next, r)
 				continue
 			}
@@ -388,7 +388,7 @@ func (a *App) Import(ctx context.Context, owner string, b []byte, personal bool)
 				}
 			}
 			stamp := domain.Now()
-			_, err = tx.ExecContext(ctx, "INSERT INTO records VALUES(?,?,?,?,?,?,?,?,?,?)", ids[r.ID], owner, r.Kind, nullValue(ids[r.Parent]), nullValue(ids[r.Project]), nullValue(ids[r.Paper]), max(1, r.Version), string(domain.Encode(data)), stamp, stamp)
+			_, err = tx.ExecContext(ctx, "INSERT INTO records VALUES(?,?,?,?,?,?,?,?,?,?)", ids[r.ID], owner, r.Kind, nullValue(ids[r.Parent]), nullValue(ids[r.Course]), nullValue(ids[r.Lesson]), max(1, r.Version), string(domain.Encode(data)), stamp, stamp)
 			if err != nil {
 				return domain.Record{}, err
 			}
@@ -403,7 +403,7 @@ func (a *App) Import(ctx context.Context, owner string, b []byte, personal bool)
 	if err = tx.Commit(); err != nil {
 		return domain.Record{}, err
 	}
-	return a.Store.Get(ctx, owner, project, "project")
+	return a.Store.Get(ctx, owner, course, "course")
 }
 func nullValue(v string) any {
 	if v == "" {

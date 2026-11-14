@@ -112,7 +112,7 @@ func deckLabels(lang string) deckWords {
 	if lang == "zh-TW" {
 		return deckWords{"論文導讀", "Q & A", "謝謝聆聽", "大家好，今天要和大家分享的論文是〈%s〉。接下來會依序說明研究動機、方法、實驗結果與限制。", "以上就是這篇論文的重點整理。謝謝大家，歡迎提問與討論。", "請看這張圖。"}
 	}
-	return deckWords{"Paper reading", "Q & A", "Thank you", "Hello everyone. Today I will present “%s”, covering its motivation, method, results and limitations.", "That concludes the main points of this paper. Thank you, and I am happy to take questions.", "Let us look at this figure."}
+	return deckWords{"Lesson reading", "Q & A", "Thank you", "Hello everyone. Today I will present “%s”, covering its motivation, method, results and limitations.", "That concludes the main points of this lesson. Thank you, and I am happy to take questions.", "Let us look at this figure."}
 }
 
 // Slide geometry (fractions of the slide).
@@ -123,7 +123,7 @@ func scaled(size, scale float64) float64 { return float64(int(size*scale*2+0.5))
 // closing slide, placed in the geometry's title and content areas. aspect
 // reports an image's width/height ratio (0 if unknown).
 func BuildDeck(sections []domain.Section, k domain.Knowledge, title, lang string, aspect func(string) float64, geo Geometry) []domain.Section {
-	if names := PaperNames(k); len(names) > 0 {
+	if names := LessonNames(k); len(names) > 0 {
 		title = names[0]
 	}
 	if aspect == nil {
@@ -136,7 +136,7 @@ func BuildDeck(sections []domain.Section, k domain.Knowledge, title, lang string
 	if len(k.Units) > 0 {
 		cite = []string{k.Units[0].ID}
 	}
-	names := PaperNames(k)
+	names := LessonNames(k)
 	subtitle := ""
 	if len(names) > 1 {
 		subtitle = strings.Join(names[1:], "\n")
@@ -145,7 +145,7 @@ func BuildDeck(sections []domain.Section, k domain.Knowledge, title, lang string
 	var cover []domain.Element
 	if geo.Template {
 		// The template's title layout: title in its title area, the kind of
-		// document (and further papers) in its subtitle area.
+		// document (and further lessons) in its subtitle area.
 		display := textBox("title", "display", ct[0], ct[1], ct[2], ct[3], title, sz(36), true)
 		display.Align = geo.CoverAlign
 		sub := textBox("subtitle", "subtitle", cs[0], cs[1], cs[2], cs[3], strings.TrimSpace(words.kicker+"\n"+subtitle), sz(18), false)

@@ -35,9 +35,9 @@ func Defaults(kind string) domain.Style {
 }
 
 // Resolve merges field by field; explicit nil, false and empty values are overrides.
-func Resolve(kind string, common, specific, project, current domain.Style) (domain.Style, error) {
+func Resolve(kind string, common, specific, course, current domain.Style) (domain.Style, error) {
 	out := Defaults(kind)
-	for _, s := range []domain.Style{common, specific, project, current} {
+	for _, s := range []domain.Style{common, specific, course, current} {
 		if err := Validate(s); err != nil {
 			return nil, err
 		}
@@ -47,10 +47,10 @@ func Resolve(kind string, common, specific, project, current domain.Style) (doma
 	}
 	return out, nil
 }
-func Snapshot(selected []string, version domain.ProfileVersion, project, current map[string]domain.Style) (domain.StyleSnapshot, error) {
+func Snapshot(selected []string, version domain.ProfileVersion, course, current map[string]domain.Style) (domain.StyleSnapshot, error) {
 	out := domain.StyleSnapshot{Schema: 1, ProfileID: version.ProfileID, Resolved: map[string]domain.Style{}}
 	for _, kind := range selected {
-		resolved, err := Resolve(kind, version.Common, version.Outputs[kind], project[kind], current[kind])
+		resolved, err := Resolve(kind, version.Common, version.Outputs[kind], course[kind], current[kind])
 		if err != nil {
 			return out, err
 		}

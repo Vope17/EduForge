@@ -19,8 +19,8 @@ import (
 	styles "eduforge/internal/style"
 )
 
-func (a *App) resolveStyle(ctx context.Context, owner, project, profileID string, selected []string, overrides map[string]domain.Style) (domain.StyleSnapshot, error) {
-	_, p, err := get[domain.Project](ctx, a, owner, project, "project")
+func (a *App) resolveStyle(ctx context.Context, owner, course, profileID string, selected []string, overrides map[string]domain.Style) (domain.StyleSnapshot, error) {
+	_, p, err := get[domain.Course](ctx, a, owner, course, "course")
 	if err != nil {
 		return domain.StyleSnapshot{}, err
 	}
@@ -48,7 +48,7 @@ func (a *App) resolveStyle(ctx context.Context, owner, project, profileID string
 	snapshot.ProfileVersionID = versionID
 	return snapshot, err
 }
-func (a *App) CreateRequest(ctx context.Context, owner, project string, req domain.Request) (domain.Record, error) {
+func (a *App) CreateRequest(ctx context.Context, owner, course string, req domain.Request) (domain.Record, error) {
 	if !domain.Language(req.UILanguage) {
 		return domain.Record{}, errors.New("invalid_language")
 	}
@@ -60,19 +60,19 @@ func (a *App) CreateRequest(ctx context.Context, owner, project string, req doma
 			return domain.Record{}, errors.New("invalid_language")
 		}
 	}
-	if len(req.PaperIDs) == 0 {
-		return domain.Record{}, errors.New("select_paper")
+	if len(req.LessonIDs) == 0 {
+		return domain.Record{}, errors.New("select_lesson")
 	}
 	req.Unlimited = true
 	req.AllowPaid = true
 	req.Budget = nil
 	req.Targets = nil
-	targets, err := a.generationTargets(ctx, owner, project, req)
+	targets, err := a.generationTargets(ctx, owner, course, req)
 	if err != nil {
 		return domain.Record{}, err
 	}
 	req.Targets = targets
-	if req.UsePaperSettings {
+	if req.UseLessonSettings {
 		req.Selected = nil
 		for _, kind := range []string{"A", "B"} {
 			for _, target := range targets {
@@ -93,7 +93,7 @@ func (a *App) CreateRequest(ctx context.Context, owner, project string, req doma
 			return domain.Record{}, err
 		}
 	}
-	req.Style, err = a.resolveStyle(ctx, owner, project, req.ProfileID, req.Selected, req.Overrides)
+	req.Style, err = a.resolveStyle(ctx, owner, course, req.ProfileID, req.Selected, req.Overrides)
 	if err != nil {
 		return domain.Record{}, err
 	}
@@ -102,21 +102,21 @@ func (a *App) CreateRequest(ctx context.Context, owner, project string, req doma
 	req.PreviewIDs = []string{}
 	req.Settings = NormalizeSettings(req.Settings)
 	req.Started = domain.Now()
-	return a.create(ctx, owner, "request", project, project, "", req)
+	return a.create(ctx, owner, "request", course, course, "", req)
 }
-func (a *App) generationTargets(ctx context.Context, owner, project string, req domain.Request) ([]domain.GenerationTarget, error) {
+func (a *App) generationTargets(ctx context.Context, owner, course string, req domain.Request) ([]domain.GenerationTarget, error) {
 	if len(req.Targets) != 0 {
 		return req.Targets, nil
 	}
-	targets := make([]domain.GenerationTarget, 0, len(req.PaperIDs))
-	seen := make(map[string]bool, len(req.PaperIDs))
-	for _, id := range req.PaperIDs {
+	targets := make([]domain.GenerationTarget, 0, len(req.LessonIDs))
+	seen := make(map[string]bool, len(req.LessonIDs))
+	for _, id := range req.LessonIDs {
 		if seen[id] {
-			return nil, errors.New("duplicate_paper")
+			return nil, errors.New("duplicate_lesson")
 		}
 		seen[id] = true
-		r, p, err := get[domain.Paper](ctx, a, owner, id, "paper")
-		if err != nil || r.Project != project {
+		r, p, err := get[domain.Lesson](ctx, a, owner, id, "lesson")
+		if err != nil || r.Course != course {
 			return nil, domain.ErrNotFound
 		}
 		if p.KnowledgeID == "" {
@@ -140,10 +140,10 @@ func (a *App) generationTargets(ctx context.Context, owner, project string, req 
 				settings.Languages[kind] = lang
 			}
 		}
-		if req.UsePaperSettings {
+		if req.UseLessonSettings {
 			settings = p.Settings
 			if len(settings.Selected) == 0 {
-				return nil, errors.New("paper_output_settings_required")
+				return nil, errors.New("lesson_output_settings_required")
 			}
 		}
 		settings = NormalizeSettings(settings)
@@ -153,7 +153,7 @@ func (a *App) generationTargets(ctx context.Context, owner, project string, req 
 		if err := validateOutputSettings(settings); err != nil {
 			return nil, err
 		}
-		target := domain.GenerationTarget{PaperID: id, KnowledgeID: p.KnowledgeID, Settings: settings}
+		target := domain.GenerationTarget{LessonID: id, KnowledgeID: p.KnowledgeID, Settings: settings}
 		if slices.Contains(settings.Selected, "B") && settings.TemplateID != "" {
 			t, err := a.templateOf(ctx, owner, settings.TemplateID, "pptx")
 			if err != nil {
@@ -244,7 +244,7 @@ func (a *App) StartRequest(ctx context.Context, owner, requestID, ui string, use
 		}
 		req.UILanguage = ui
 	}
-	targets, err := a.generationTargets(ctx, owner, r.Project, req)
+	targets, err := a.generationTargets(ctx, owner, r.Course, req)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +257,7 @@ func (a *App) StartRequest(ctx context.Context, owner, requestID, ui string, use
 			if kind == "A" {
 				t.ReadTerms = known
 			}
-			out = append(out, domain.Record{Project: r.Project, Paper: target.PaperID, Data: domain.Encode(t)})
+			out = append(out, domain.Record{Course: r.Course, Lesson: target.LessonID, Data: domain.Encode(t)})
 		}
 	}
 	req.Status = "running"
@@ -523,7 +523,7 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 	var sections []domain.Section
 	mode := "model"
 	if kind == "B" && !preview {
-		// A deck follows the paper: planned first, then written in batches.
+		// A deck follows the lesson: planned first, then written in batches.
 		var finished bool
 		sections, mode, finished, err = a.writeDeck(ctx, owner, id, r, t, k, done)
 		if err != nil || !finished {
@@ -531,7 +531,7 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 		}
 	} else {
 		// Readers and decks are written section by section in SectionOrder
-		// (related work only when the paper discusses it). A style preview
+		// (related work only when the lesson discusses it). A style preview
 		// writes the first section only.
 		order := []int{}
 		for _, i := range research.SectionOrder {
@@ -567,7 +567,7 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 				return err
 			}
 			step := domain.Step{TaskID: id, Key: key, Content: result.Section, Provider: result.Provider, Model: result.Model, Language: t.Language, Cost: result.Cost, Mode: result.Mode}
-			if _, err = a.create(ctx, owner, "step", id, r.Project, r.Paper, step); err != nil {
+			if _, err = a.create(ctx, owner, "step", id, r.Course, r.Lesson, step); err != nil {
 				return err
 			}
 			done[key] = step
@@ -597,7 +597,7 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 		}
 	}
 	related := append([]string{}, t.RelatedKnowledge...)
-	art := domain.Artifact{GroupedPapers: t.GroupedPapers, RelatedKnowledge: related, Type: kind, Language: t.Language, KnowledgeID: t.KnowledgeID, RequestID: t.RequestID, TaskID: id, Style: t.Style, Settings: t.Settings, Sections: sections, Mode: mode}
+	art := domain.Artifact{GroupedLessons: t.GroupedLessons, RelatedKnowledge: related, Type: kind, Language: t.Language, KnowledgeID: t.KnowledgeID, RequestID: t.RequestID, TaskID: id, Style: t.Style, Settings: t.Settings, Sections: sections, Mode: mode}
 	support, err := a.ArtifactKnowledge(ctx, owner, art)
 	if err != nil {
 		return err
@@ -622,14 +622,14 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 	return a.finishArtifact(ctx, owner, r, art, preview)
 }
 
-// writeDeck writes a deck that follows the paper: a model plans the talk
-// from the whole paper (step "outline"), then writes the slides a batch at
+// writeDeck writes a deck that follows the lesson: a model plans the talk
+// from the whole lesson (step "outline"), then writes the slides a batch at
 // a time from their pages and page images (steps "slides:<n>"). It reports
 // whether the task got to the end (false when paused or cancelled).
 func (a *App) writeDeck(ctx context.Context, owner, id string, r domain.Record, t domain.Task, k domain.Knowledge, done map[string]domain.Step) ([]domain.Section, string, bool, error) {
 	save := func(key string, step domain.Step, total int) error {
 		step.TaskID, step.Key, step.Language = id, key, t.Language
-		if _, err := a.create(ctx, owner, "step", id, r.Project, r.Paper, step); err != nil {
+		if _, err := a.create(ctx, owner, "step", id, r.Course, r.Lesson, step); err != nil {
 			return err
 		}
 		done[key] = step
@@ -766,7 +766,7 @@ func (a *App) finishArtifact(ctx context.Context, owner string, task domain.Reco
 	if preview {
 		kind = "preview"
 	}
-	items, err := a.Store.List(ctx, owner, store.Filter{Kind: kind, Paper: task.Paper})
+	items, err := a.Store.List(ctx, owner, store.Filter{Kind: kind, Lesson: task.Lesson})
 	if err != nil {
 		return err
 	}
@@ -779,7 +779,7 @@ func (a *App) finishArtifact(ctx context.Context, owner string, task domain.Reco
 		}
 	}
 	if result.ID == "" {
-		result, err = a.create(ctx, owner, kind, task.ID, task.Project, task.Paper, art)
+		result, err = a.create(ctx, owner, kind, task.ID, task.Course, task.Lesson, art)
 		if err != nil {
 			return err
 		}
@@ -837,7 +837,7 @@ func (a *App) updateRequestStatus(ctx context.Context, owner, id string) {
 	})
 }
 func (a *App) parseTask(ctx context.Context, owner string, task domain.Record) error {
-	sources, err := a.Store.List(ctx, owner, store.Filter{Kind: "source", Paper: task.Paper})
+	sources, err := a.Store.List(ctx, owner, store.Filter{Kind: "source", Lesson: task.Lesson})
 	if err != nil {
 		return err
 	}
@@ -871,11 +871,11 @@ func (a *App) parseTask(ctx context.Context, owner string, task domain.Record) e
 			return nil
 		})
 	}
-	sources, err = a.Store.List(ctx, owner, store.Filter{Kind: "source", Paper: task.Paper})
+	sources, err = a.Store.List(ctx, owner, store.Filter{Kind: "source", Lesson: task.Lesson})
 	if err != nil {
 		return err
 	}
-	_, p, err := get[domain.Paper](ctx, a, owner, task.Paper, "paper")
+	_, p, err := get[domain.Lesson](ctx, a, owner, task.Lesson, "lesson")
 	if err != nil {
 		return err
 	}
@@ -901,11 +901,11 @@ func (a *App) parseTask(ctx context.Context, owner string, task domain.Record) e
 	if !a.taskCanContinue(ctx, owner, task.ID) {
 		return nil
 	}
-	r, err := a.create(ctx, owner, "knowledge", task.Paper, task.Project, task.Paper, k)
+	r, err := a.create(ctx, owner, "knowledge", task.Lesson, task.Course, task.Lesson, k)
 	if err != nil {
 		return err
 	}
-	_, err = set[domain.Paper](ctx, a, owner, task.Paper, 0, func(p *domain.Paper) error {
+	_, err = set[domain.Lesson](ctx, a, owner, task.Lesson, 0, func(p *domain.Lesson) error {
 		p.KnowledgeID = r.ID
 		return nil
 	})
@@ -951,9 +951,9 @@ func (a *App) EditArtifact(ctx context.Context, owner, id string, version int, i
 		}
 	}
 	a0.Check = research.Validate(a0, k)
-	r, err := a.Store.Create(ctx, domain.Record{Owner: owner, Kind: "artifact", Parent: old.Parent, Project: old.Project, Paper: old.Paper, Version: old.Version + 1, Data: domain.Encode(a0)})
+	r, err := a.Store.Create(ctx, domain.Record{Owner: owner, Kind: "artifact", Parent: old.Parent, Course: old.Course, Lesson: old.Lesson, Version: old.Version + 1, Data: domain.Encode(a0)})
 	if err == nil {
-		a.Store.Event(ctx, owner, old.Project, old.Paper, "artifact_edit", map[string]any{"previous": id, "current": r.ID, "edits": a0.Edits, "editor_elapsed_seconds": input.EditingSeconds})
+		a.Store.Event(ctx, owner, old.Course, old.Lesson, "artifact_edit", map[string]any{"previous": id, "current": r.ID, "edits": a0.Edits, "editor_elapsed_seconds": input.EditingSeconds})
 	}
 	return r, err
 }

@@ -9,7 +9,7 @@ import (
 	"eduforge/internal/domain"
 )
 
-// Term extraction favours how papers actually introduce vocabulary:
+// Term extraction favours how lessons actually introduce vocabulary:
 //  1. "long form (ABBR)" where the long form's initials spell the abbreviation,
 //  2. short "Term: definition" lines (not captions, headings or URLs),
 //  3. undefined acronyms that recur often enough to matter.

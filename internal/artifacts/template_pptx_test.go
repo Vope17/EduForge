@@ -130,7 +130,7 @@ func TestDeckIsBuiltOnTheImportedTemplate(t *testing.T) {
 	}
 	tpl.File = rel
 	style := TemplateStyle(tpl)
-	deck := BuildDeck([]domain.Section{{Title: "Method", Body: "- point one", Notes: "say this"}}, domain.Knowledge{Title: "Paper"}, "Paper", "en", nil, GeometryOf(style))
+	deck := BuildDeck([]domain.Section{{Title: "Method", Body: "- point one", Notes: "say this"}}, domain.Knowledge{Title: "Lesson"}, "Lesson", "en", nil, GeometryOf(style))
 	if g := GeometryOf(style); deck[1].Layout[0].X != g.Title[0] || deck[1].Layout[0].Size != 21 || deck[1].Layout[0].Align != "center" {
 		t.Fatalf("content title should sit in the template's title area, scaled to its slide: %#v", deck[1].Layout[0])
 	}

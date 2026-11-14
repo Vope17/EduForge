@@ -178,7 +178,7 @@ func readerDocument(s *store.Store, a domain.Artifact, k domain.Knowledge) []byt
 			}
 		}
 	}
-	if names := PaperNames(k); len(names) > 0 {
+	if names := LessonNames(k); len(names) > 0 {
 		write("Section", referencesTitle(a.Language))
 		for i, name := range names {
 			write("Standard", fmt.Sprintf("[%d] %s", i+1, name))

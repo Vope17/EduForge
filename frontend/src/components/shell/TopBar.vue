@@ -4,7 +4,7 @@ import { useWorkspace } from '../../lib/workspace.ts'
 import { activeTasks } from '../../lib/status.ts'
 import Icon from '../Icon.vue'
 
-const { state, route, go, t, paper } = useWorkspace()
+const { state, route, go, t, lesson } = useWorkspace()
 const running = computed(() => activeTasks(state.snapshot).length)
 const conn = computed(() => state.connection)
 const connLabel = computed(() => {
@@ -14,11 +14,11 @@ const connLabel = computed(() => {
   return t('connectionNone')
 })
 const crumbs = computed(() => {
-  const project = state.snapshot.project?.data.name || ''
+  const course = state.snapshot.course?.data.name || ''
   if (route.name === 'settings') return [t('settings'), t('settingsTab_' + route.tab)]
-  if (route.name === 'batch') return [project, t('batchStudio')]
-  if (route.name === 'paper' && paper.value) return [project, paper.value.data.title, t('step_' + route.step)]
-  return [project || 'EduForge']
+  if (route.name === 'batch') return [course, t('batchStudio')]
+  if (route.name === 'lesson' && lesson.value) return [course, lesson.value.data.title, t('step_' + route.step)]
+  return [course || 'EduForge']
 })
 </script>
 

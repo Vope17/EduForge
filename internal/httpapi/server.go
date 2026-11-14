@@ -136,22 +136,22 @@ func (s *Server) routes() {
 		writeJSON(w, 200, map[string]any{"tools": tools, "container": os.Getenv("EDUFORGE_CONTAINER") == "1"})
 		return nil
 	})
-	s.handle("GET /api/projects", func(w http.ResponseWriter, r *http.Request) error {
-		items, err := s.App.Store.List(r.Context(), owner(r), store.Filter{Kind: "project"})
+	s.handle("GET /api/courses", func(w http.ResponseWriter, r *http.Request) error {
+		items, err := s.App.Store.List(r.Context(), owner(r), store.Filter{Kind: "course"})
 		respond(w, items, err)
 		return nil
 	})
-	s.handle("POST /api/projects", func(w http.ResponseWriter, r *http.Request) error {
-		var p domain.Project
+	s.handle("POST /api/courses", func(w http.ResponseWriter, r *http.Request) error {
+		var p domain.Course
 		if err := decode(r, w, &p); err != nil {
 			return err
 		}
-		out, err := s.App.CreateProject(r.Context(), owner(r), p)
+		out, err := s.App.CreateCourse(r.Context(), owner(r), p)
 		respond(w, out, err)
 		return nil
 	})
 	s.handle("GET /api/summary", func(w http.ResponseWriter, r *http.Request) error {
-		out, err := s.App.Summary(r.Context(), owner(r), r.URL.Query().Get("project_id"))
+		out, err := s.App.Summary(r.Context(), owner(r), r.URL.Query().Get("course_id"))
 		respond(w, out, err)
 		return nil
 	})
@@ -167,88 +167,88 @@ func (s *Server) routes() {
 		respond(w, out, err)
 		return nil
 	})
-	s.handle("DELETE /api/projects/{id}", func(w http.ResponseWriter, r *http.Request) error {
-		if r.URL.Query().Get("confirm") != "delete-project-data" {
+	s.handle("DELETE /api/courses/{id}", func(w http.ResponseWriter, r *http.Request) error {
+		if r.URL.Query().Get("confirm") != "delete-course-data" {
 			return errors.New("deletion_confirmation_required")
 		}
-		err := s.App.DeleteProject(r.Context(), owner(r), r.PathValue("id"))
+		err := s.App.DeleteCourse(r.Context(), owner(r), r.PathValue("id"))
 		respond(w, map[string]bool{"deleted": err == nil}, err)
 		return nil
 	})
-	s.handle("POST /api/projects/{id}/papers", func(w http.ResponseWriter, r *http.Request) error {
-		var p domain.Paper
+	s.handle("POST /api/courses/{id}/lessons", func(w http.ResponseWriter, r *http.Request) error {
+		var p domain.Lesson
 		if err := decode(r, w, &p); err != nil {
 			return err
 		}
-		out, err := s.App.CreatePaper(r.Context(), owner(r), r.PathValue("id"), p)
+		out, err := s.App.CreateLesson(r.Context(), owner(r), r.PathValue("id"), p)
 		respond(w, out, err)
 		return nil
 	})
-	s.handle("PUT /api/papers/{id}", func(w http.ResponseWriter, r *http.Request) error {
+	s.handle("PUT /api/lessons/{id}", func(w http.ResponseWriter, r *http.Request) error {
 		var input struct {
-			Version int          `json:"version"`
-			Paper   domain.Paper `json:"paper"`
+			Version int           `json:"version"`
+			Lesson  domain.Lesson `json:"lesson"`
 		}
 		if err := decode(r, w, &input); err != nil {
 			return err
 		}
-		out, err := s.App.SavePaper(r.Context(), owner(r), r.PathValue("id"), input.Version, input.Paper)
+		out, err := s.App.SaveLesson(r.Context(), owner(r), r.PathValue("id"), input.Version, input.Lesson)
 		respond(w, out, err)
 		return nil
 	})
-	s.handle("DELETE /api/papers/{id}", func(w http.ResponseWriter, r *http.Request) error {
-		if r.URL.Query().Get("confirm") != "delete-paper-data" {
+	s.handle("DELETE /api/lessons/{id}", func(w http.ResponseWriter, r *http.Request) error {
+		if r.URL.Query().Get("confirm") != "delete-lesson-data" {
 			return errors.New("deletion_confirmation_required")
 		}
-		err := s.App.DeletePaper(r.Context(), owner(r), r.PathValue("id"))
+		err := s.App.DeleteLesson(r.Context(), owner(r), r.PathValue("id"))
 		respond(w, map[string]bool{"deleted": err == nil}, err)
 		return nil
 	})
-	s.handle("PUT /api/papers/{id}/folder", func(w http.ResponseWriter, r *http.Request) error {
+	s.handle("PUT /api/lessons/{id}/chapter", func(w http.ResponseWriter, r *http.Request) error {
 		var input struct {
-			Folder string `json:"folder"`
+			Chapter string `json:"chapter"`
 		}
 		if err := decode(r, w, &input); err != nil {
 			return err
 		}
-		out, err := s.App.MovePaper(r.Context(), owner(r), r.PathValue("id"), input.Folder)
+		out, err := s.App.MoveLesson(r.Context(), owner(r), r.PathValue("id"), input.Chapter)
 		respond(w, out, err)
 		return nil
 	})
-	s.handle("POST /api/projects/{id}/folders", func(w http.ResponseWriter, r *http.Request) error {
+	s.handle("POST /api/courses/{id}/chapters", func(w http.ResponseWriter, r *http.Request) error {
 		var input struct {
 			Name string `json:"name"`
 		}
 		if err := decode(r, w, &input); err != nil {
 			return err
 		}
-		out, err := s.App.CreateFolder(r.Context(), owner(r), r.PathValue("id"), input.Name)
+		out, err := s.App.CreateChapter(r.Context(), owner(r), r.PathValue("id"), input.Name)
 		respond(w, out, err)
 		return nil
 	})
-	s.handle("PUT /api/folders/{id}", func(w http.ResponseWriter, r *http.Request) error {
+	s.handle("PUT /api/chapters/{id}", func(w http.ResponseWriter, r *http.Request) error {
 		var input struct {
 			Name string `json:"name"`
 		}
 		if err := decode(r, w, &input); err != nil {
 			return err
 		}
-		out, err := s.App.RenameFolder(r.Context(), owner(r), r.PathValue("id"), input.Name)
+		out, err := s.App.RenameChapter(r.Context(), owner(r), r.PathValue("id"), input.Name)
 		respond(w, out, err)
 		return nil
 	})
-	s.handle("DELETE /api/folders/{id}", func(w http.ResponseWriter, r *http.Request) error {
-		err := s.App.DeleteFolder(r.Context(), owner(r), r.PathValue("id"))
+	s.handle("DELETE /api/chapters/{id}", func(w http.ResponseWriter, r *http.Request) error {
+		err := s.App.DeleteChapter(r.Context(), owner(r), r.PathValue("id"))
 		respond(w, map[string]bool{"deleted": err == nil}, err)
 		return nil
 	})
-	s.handle("POST /api/papers/{id}/sources", s.upload)
-	s.handle("POST /api/papers/{id}/parse", func(w http.ResponseWriter, r *http.Request) error {
+	s.handle("POST /api/lessons/{id}/sources", s.upload)
+	s.handle("POST /api/lessons/{id}/parse", func(w http.ResponseWriter, r *http.Request) error {
 		out, err := s.App.QueueParse(r.Context(), owner(r), r.PathValue("id"))
 		respond(w, out, err)
 		return nil
 	})
-	s.handle("PUT /api/papers/{id}/knowledge", func(w http.ResponseWriter, r *http.Request) error {
+	s.handle("PUT /api/lessons/{id}/knowledge", func(w http.ResponseWriter, r *http.Request) error {
 		var input struct {
 			Version   int              `json:"version"`
 			Knowledge domain.Knowledge `json:"knowledge"`
@@ -260,7 +260,7 @@ func (s *Server) routes() {
 		respond(w, out, err)
 		return nil
 	})
-	s.handle("POST /api/papers/{id}/knowledge/ai", func(w http.ResponseWriter, r *http.Request) error {
+	s.handle("POST /api/lessons/{id}/knowledge/ai", func(w http.ResponseWriter, r *http.Request) error {
 		var input struct {
 			Version int `json:"version"`
 		}
@@ -387,7 +387,7 @@ func (s *Server) routes() {
 		return nil
 	})
 	s.handle("PUT /api/providers/order", s.providerOrder)
-	s.handle("POST /api/projects/{id}/requests", func(w http.ResponseWriter, r *http.Request) error {
+	s.handle("POST /api/courses/{id}/requests", func(w http.ResponseWriter, r *http.Request) error {
 		var input domain.Request
 		if err := decode(r, w, &input); err != nil {
 			return err
@@ -507,15 +507,15 @@ func (s *Server) routes() {
 		writeJSON(w, 200, rendered)
 		return nil
 	})
-	s.handle("GET /api/projects/{id}/export", func(w http.ResponseWriter, r *http.Request) error {
+	s.handle("GET /api/courses/{id}/export", func(w http.ResponseWriter, r *http.Request) error {
 		b, err := s.App.Export(r.Context(), owner(r), r.PathValue("id"), r.URL.Query().Get("personal") == "true")
 		if err != nil {
 			return err
 		}
-		attachment(w, "eduforge-project.zip", "application/zip", b)
+		attachment(w, "eduforge-course.zip", "application/zip", b)
 		return nil
 	})
-	s.handle("POST /api/projects/import", s.importProject)
+	s.handle("POST /api/courses/import", s.importCourse)
 	s.handle("DELETE /api/records/{id}", s.deleteRecord)
 	s.Mux.HandleFunc("/", s.static)
 }
@@ -726,7 +726,7 @@ func (s *Server) file(w http.ResponseWriter, r *http.Request) error {
 	http.ServeFile(w, r, file)
 	return nil
 }
-func (s *Server) importProject(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) importCourse(w http.ResponseWriter, r *http.Request) error {
 	r.Body = http.MaxBytesReader(w, r.Body, 129<<20)
 	if err := r.ParseMultipartForm(8 << 20); err != nil {
 		return errors.New("invalid_upload")

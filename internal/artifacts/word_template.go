@@ -168,8 +168,8 @@ func InspectWordTemplate(ctx context.Context, s *store.Store, file string) (doma
 
 func renderWordPreview(ctx context.Context, s *store.Store, file string, t *domain.Template) error {
 	blocks := []wordBlock{
-		{Kind: "subtitle", Text: "論文導讀 · Paper reading guide"},
-		{Kind: "title", Text: "論文題目 Paper title"},
+		{Kind: "subtitle", Text: "論文導讀 · Lesson reading guide"},
+		{Kind: "title", Text: "論文題目 Lesson title"},
 		{Kind: "h1", Text: "I.  研究動機與問題"},
 		{Kind: "para", Text: "這裡是讀本內文，會套用模板的內文樣式、字型與段落設定。The reader's text uses the template's body style."},
 		{Kind: "bullet", Text: "重點一：模板的標題與內文樣式"},
@@ -247,7 +247,7 @@ func readerBlocks(s *store.Store, a domain.Artifact, k domain.Knowledge) []wordB
 			}
 		}
 	}
-	if names := PaperNames(k); len(names) > 0 {
+	if names := LessonNames(k); len(names) > 0 {
 		blocks = append(blocks, wordBlock{Kind: "h1", Text: referencesTitle(a.Language)})
 		for i, name := range names {
 			blocks = append(blocks, wordBlock{Kind: "para", Text: fmt.Sprintf("[%d] %s", i+1, name)})

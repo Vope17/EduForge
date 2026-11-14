@@ -5,8 +5,8 @@ import { activeTasks } from './lib/status.ts'
 import AppSidebar from './components/shell/AppSidebar.vue'
 import TopBar from './components/shell/TopBar.vue'
 import TaskDrawer from './components/shell/TaskDrawer.vue'
-import ProjectHome from './components/views/ProjectHome.vue'
-import PaperView from './components/views/PaperView.vue'
+import CourseHome from './components/views/CourseHome.vue'
+import LessonView from './components/views/LessonView.vue'
 import BatchView from './components/views/BatchView.vue'
 import SettingsView from './components/views/SettingsView.vue'
 
@@ -32,22 +32,22 @@ onMounted(async () => {
 onUnmounted(() => clearTimeout(timer))
 
 // Route → workspace context
-watch(() => [route.name, route.project, route.paper], async () => {
-  if (route.project && route.project !== state.projectID) {
-    state.projectID = route.project
+watch(() => [route.name, route.course, route.lesson], async () => {
+  if (route.course && route.course !== state.courseID) {
+    state.courseID = route.course
     state.selected = []
     await refresh().catch(() => {})
   }
-  state.paperID = route.name === 'paper' ? route.paper ?? '' : ''
+  state.lessonID = route.name === 'lesson' ? route.lesson ?? '' : ''
   state.nav = false
 }, { immediate: true })
 watch(() => [route.name, route.step, route.tab], () => { state.nav = false })
 
-// Normalize the URL once projects are known (e.g. "#/" → first project).
-watch(() => [ready.value, state.projectID], () => {
+// Normalize the URL once courses are known (e.g. "#/" → first course).
+watch(() => [ready.value, state.courseID], () => {
   if (!ready.value) return
-  if (route.name === 'home' && !route.project && state.projectID) go({ name: 'home', project: state.projectID }, { replace: true })
-  if (route.name === 'paper' && !(state.snapshot.paper || []).some(p => p.id === route.paper)) go({ name: 'home', project: state.projectID }, { replace: true })
+  if (route.name === 'home' && !route.course && state.courseID) go({ name: 'home', course: state.courseID }, { replace: true })
+  if (route.name === 'lesson' && !(state.snapshot.lesson || []).some(p => p.id === route.lesson)) go({ name: 'home', course: state.courseID }, { replace: true })
 })
 watch(() => state.language, lang => { document.documentElement.lang = lang }, { immediate: true })
 </script>
@@ -63,9 +63,9 @@ watch(() => state.language, lang => { document.documentElement.lang = lang }, { 
       </div>
       <div v-if="!ready" class="page-content"><p class="empty-inline">{{ t('loading') }}</p></div>
       <SettingsView v-else-if="route.name === 'settings'" />
-      <PaperView v-else-if="route.name === 'paper' && state.paperID" :key="state.paperID" />
+      <LessonView v-else-if="route.name === 'lesson' && state.lessonID" :key="state.lessonID" />
       <BatchView v-else-if="route.name === 'batch'" />
-      <ProjectHome v-else />
+      <CourseHome v-else />
     </main>
     <TaskDrawer />
     <div v-if="state.toast" class="toast" role="status">✓ {{ state.toast }}</div>

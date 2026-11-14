@@ -5,24 +5,24 @@ import ConnectionNotice from './ConnectionNotice.vue'
 import TemplatePicker from '../editor/TemplatePicker.vue'
 import type { Rec, Request } from '../../api/types.ts'
 
-const props = defineProps<{ paperIds: string[] }>()
+const props = defineProps<{ lessonIds: string[] }>()
 const emit = defineEmits<{ started: [requestID: string] }>()
 const { state, t, api, act, explain } = useWorkspace()
 const form = reactive({
-  selected: ['A'], use_paper_settings: false, languages: { A: '', B: '' }, profile_id: '',
+  selected: ['A'], use_lesson_settings: false, languages: { A: '', B: '' }, profile_id: '',
   settings: { depth: 'standard', level: 'intermediate', audience: 'classmates', minutes: 10, template_id: '', reader_template_id: '', languages: {} as Record<string, string>, instructions: { A: '', B: '' } as Record<string, string> },
   overrides: { A: {}, B: {} },
 })
-const papers = computed(() => (state.snapshot.paper || []).filter(p => props.paperIds.includes(p.id)))
-const single = computed(() => papers.value.length === 1 ? papers.value[0] : null)
-const savedKinds = computed(() => ['A', 'B'].filter(kind => papers.value.some(p => p.data.settings?.selected?.includes(kind))))
-const activeKinds = computed(() => form.use_paper_settings ? savedKinds.value : form.selected)
-const unconfirmed = computed(() => papers.value.filter(p => !(state.snapshot.knowledge || []).find(k => k.id === p.data.knowledge_id)?.data.confirmed))
-const has = (kind: string) => !form.use_paper_settings && form.selected.includes(kind)
+const lessons = computed(() => (state.snapshot.lesson || []).filter(p => props.lessonIds.includes(p.id)))
+const single = computed(() => lessons.value.length === 1 ? lessons.value[0] : null)
+const savedKinds = computed(() => ['A', 'B'].filter(kind => lessons.value.some(p => p.data.settings?.selected?.includes(kind))))
+const activeKinds = computed(() => form.use_lesson_settings ? savedKinds.value : form.selected)
+const unconfirmed = computed(() => lessons.value.filter(p => !(state.snapshot.knowledge || []).find(k => k.id === p.data.knowledge_id)?.data.confirmed))
+const has = (kind: string) => !form.use_lesson_settings && form.selected.includes(kind)
 
-// Start from the single paper's saved settings when it has them.
-watch(single, paper => {
-  const saved = paper?.data.settings
+// Start from the single lesson's saved settings when it has them.
+watch(single, lesson => {
+  const saved = lesson?.data.settings
   if (!saved?.selected?.length) return
   form.selected = [...saved.selected]
   Object.assign(form.languages, { A: '', B: '' }, saved.languages || {})
@@ -34,11 +34,11 @@ watch(single, paper => {
 // previews, decide how outputs look.
 async function generate() {
   const result = await act(async () => {
-    const request = await api<Rec<Request>>(`/projects/${state.projectID}/requests`, {
+    const request = await api<Rec<Request>>(`/courses/${state.courseID}/requests`, {
       method: 'POST',
       body: {
         ...form,
-        paper_ids: props.paperIds,
+        lesson_ids: props.lessonIds,
         ui_language: state.language,
       },
     })
@@ -48,11 +48,11 @@ async function generate() {
   if (result) emit('started', result.id)
 }
 async function saveStudySettings() {
-  const paper = single.value
-  if (!paper) return
-  await act(() => api(`/papers/${paper.id}`, {
+  const lesson = single.value
+  if (!lesson) return
+  await act(() => api(`/lessons/${lesson.id}`, {
     method: 'PUT',
-    body: { version: paper.version, paper: { ...paper.data, settings: { ...form.settings, selected: form.selected, languages: form.languages } } },
+    body: { version: lesson.version, lesson: { ...lesson.data, settings: { ...form.settings, selected: form.selected, languages: form.languages } } },
   }))
 }
 </script>
@@ -61,15 +61,15 @@ async function saveStudySettings() {
   <form class="panel" @submit.prevent="generate">
     <div class="section-heading">
       <h2>{{ t('outputs') }}</h2>
-      <span class="pill">{{ papers.length }} {{ t('selected') }}</span>
+      <span class="pill">{{ lessons.length }} {{ t('selected') }}</span>
     </div>
     <ConnectionNotice />
     <div v-if="unconfirmed.length" class="draft-notice">
       {{ explain('confirm_knowledge_first') }} · {{ unconfirmed.map(p => p.data.title).join('、') }}
     </div>
-    <label v-if="papers.length > 1" class="check"><input v-model="form.use_paper_settings" type="checkbox">{{ t('useStudySettings') }}</label>
+    <label v-if="lessons.length > 1" class="check"><input v-model="form.use_lesson_settings" type="checkbox">{{ t('useStudySettings') }}</label>
 
-    <div v-if="!form.use_paper_settings" class="output-choices">
+    <div v-if="!form.use_lesson_settings" class="output-choices">
       <label v-for="kind in ['A', 'B']" :key="kind" class="output-choice" :class="{ chosen: form.selected.includes(kind) }">
         <input v-model="form.selected" type="checkbox" :value="kind">
         <span class="output-letter">{{ kind }}</span>
@@ -111,7 +111,7 @@ async function saveStudySettings() {
     <div class="form-actions">
       <p class="caption">{{ t('generateHint') }}</p>
       <div class="button-row">
-        <button v-if="single && !form.use_paper_settings" type="button" class="secondary" :disabled="!!state.busy || !form.selected.length" @click="saveStudySettings">{{ t('saveStudySettings') }}</button>
+        <button v-if="single && !form.use_lesson_settings" type="button" class="secondary" :disabled="!!state.busy || !form.selected.length" @click="saveStudySettings">{{ t('saveStudySettings') }}</button>
         <button class="primary" :disabled="!!state.busy || !activeKinds.length || unconfirmed.length > 0 || state.connection.mode === 'none'">{{ t('generate') }} →</button>
       </div>
     </div>

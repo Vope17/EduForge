@@ -8,9 +8,9 @@ import TaskRow from '../tasks/TaskRow.vue'
 import { ACTIVE } from '../../lib/status.ts'
 
 const { state, t } = useWorkspace()
-const artifacts = computed(() => (state.snapshot.artifact || []).filter(a => (a.paper_id === state.paperID || a.data.grouped_paper_ids?.includes(state.paperID))).slice().reverse())
+const artifacts = computed(() => (state.snapshot.artifact || []).filter(a => (a.lesson_id === state.lessonID || a.data.grouped_lesson_ids?.includes(state.lessonID))).slice().reverse())
 const tab = ref(artifacts.value.length ? 'artifacts' : 'setup')
-const running = computed(() => (state.snapshot.task || []).filter(x => x.paper_id === state.paperID && x.data.type !== 'parse' && !x.data.type.startsWith('preview:') && ACTIVE.includes(x.data.status)))
+const running = computed(() => (state.snapshot.task || []).filter(x => x.lesson_id === state.lessonID && x.data.type !== 'parse' && !x.data.type.startsWith('preview:') && ACTIVE.includes(x.data.status)))
 function started() { tab.value = 'artifacts' }
 </script>
 
@@ -23,6 +23,6 @@ function started() { tab.value = 'artifacts' }
     <h3>{{ t('stepGenerating') }}</h3>
     <TaskRow v-for="task in running" :key="task.id" :task="task" compact />
   </section>
-  <GenerationForm v-show="tab === 'setup'" :paper-ids="[state.paperID]" @started="started" />
+  <GenerationForm v-show="tab === 'setup'" :lesson-ids="[state.lessonID]" @started="started" />
   <ArtifactList v-if="tab === 'artifacts'" :artifacts="artifacts" />
 </template>

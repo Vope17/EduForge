@@ -132,7 +132,7 @@ func TestFlatDeckIsMeasuredFromItsSlides(t *testing.T) {
 	if !near(st.BodyBox, []float64{0.045, 0.213, 0.904, 0.684}) {
 		t.Fatalf("body box %v", st.BodyBox)
 	}
-	// The short name and the paper title under it; then authors and venue.
+	// The short name and the lesson title under it; then authors and venue.
 	if !near(st.CoverTitleBox, []float64{0.052, 0.153, 0.907, 0.254}) || !near(st.CoverSubtitleBox, []float64{0.05, 0.409, 0.909, 0.117}) {
 		t.Fatalf("cover boxes %v %v", st.CoverTitleBox, st.CoverSubtitleBox)
 	}

@@ -9,11 +9,11 @@ import (
 
 func TestModelKnowledgeIsCheckedAgainstItsSources(t *testing.T) {
 	k := domain.Knowledge{Title: "Study", Units: []domain.Unit{
-		{ID: "s:p1", SourceName: "paper.pdf", Locator: 1, Text: "We propose AIDA. Accuracy reaches 95.4% on 846 cases."},
-		{ID: "s:p2", SourceName: "paper.pdf", Locator: 2, Text: "Limitations: tested on one cloud only."},
+		{ID: "s:p1", SourceName: "lesson.pdf", Locator: 1, Text: "We propose AIDA. Accuracy reaches 95.4% on 846 cases."},
+		{ID: "s:p2", SourceName: "lesson.pdf", Locator: 2, Text: "Limitations: tested on one cloud only."},
 	}, Terms: []domain.Term{{Original: "rule term"}}}
 	prompt := KnowledgePrompt(k, "zh-TW")
-	for _, want := range []string{"[s:p1] paper.pdf · 1", "Traditional Chinese", "untrusted data", "results"} {
+	for _, want := range []string{"[s:p1] lesson.pdf · 1", "Traditional Chinese", "untrusted data", "results"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("prompt lacks %q", want)
 		}
@@ -54,8 +54,8 @@ func TestModelKnowledgeIsCheckedAgainstItsSources(t *testing.T) {
 
 func TestModelNamesTheDocumentByTheTitleItPrints(t *testing.T) {
 	k := domain.Knowledge{Title: "asdasd", Units: []domain.Unit{
-		{ID: "d:p1", SourceID: "d", SourceName: "AIDA_SIGCOMM2026_Paper_Review.pdf", Locator: 1, Text: "PA P E R R E V I E W\n\nAIDA\nAccelerating Root Cause Analysis for\nMulti-Vendor Device Failures with\nLLM-Powered Reasoning\nHaoran Xu"},
-		{ID: "d:p2", SourceID: "d", SourceName: "AIDA_SIGCOMM2026_Paper_Review.pdf", Locator: 2, Text: "Agenda. Accuracy reaches 95.4%."},
+		{ID: "d:p1", SourceID: "d", SourceName: "AIDA_SIGCOMM2026_Lesson_Review.pdf", Locator: 1, Text: "PA P E R R E V I E W\n\nAIDA\nAccelerating Root Cause Analysis for\nMulti-Vendor Device Failures with\nLLM-Powered Reasoning\nHaoran Xu"},
+		{ID: "d:p2", SourceID: "d", SourceName: "AIDA_SIGCOMM2026_Lesson_Review.pdf", Locator: 2, Text: "Agenda. Accuracy reaches 95.4%."},
 		{ID: "e:p1", SourceID: "e", SourceName: "notes.pdf", Locator: 1, Text: "Some notes without a title."},
 	}}
 	if !strings.Contains(KnowledgePrompt(k, "zh-TW"), "Never use the file name") {

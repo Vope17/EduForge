@@ -23,7 +23,7 @@ func (a *App) ArtifactKnowledge(ctx context.Context, owner string, art domain.Ar
 		if err != nil {
 			return k, err
 		}
-		if len(art.GroupedPapers) > 0 {
+		if len(art.GroupedLessons) > 0 {
 			titles = append(titles, other.Title)
 			k.Terms = append(k.Terms, other.Terms...)
 			k.Images = append(k.Images, other.Images...)
@@ -32,7 +32,7 @@ func (a *App) ArtifactKnowledge(ctx context.Context, owner string, art domain.Ar
 		k.Claims = append(k.Claims, other.Claims...)
 		k.Issues = append(k.Issues, other.Issues...)
 	}
-	if len(art.GroupedPapers) > 0 {
+	if len(art.GroupedLessons) > 0 {
 		k.Title = strings.Join(titles, " / ")
 	}
 	return k, nil

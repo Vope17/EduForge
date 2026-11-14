@@ -144,7 +144,7 @@ func (m *Manager) Generate(ctx context.Context, owner, requestID, prompt string,
 			failures = append(failures, ref.ID+":provider_missing")
 			continue
 		}
-		attempt, err := m.Store.Create(ctx, domain.Record{Owner: owner, Kind: "attempt", Parent: requestID, Project: r.Project, Data: domain.Encode(map[string]any{"provider_id": ref.ID, "model": p.Model, "status": "started"})})
+		attempt, err := m.Store.Create(ctx, domain.Record{Owner: owner, Kind: "attempt", Parent: requestID, Course: r.Course, Data: domain.Encode(map[string]any{"provider_id": ref.ID, "model": p.Model, "status": "started"})})
 		if err != nil {
 			return Result{}, err
 		}
@@ -177,13 +177,13 @@ func (m *Manager) Generate(ctx context.Context, owner, requestID, prompt string,
 		})
 		if callErr != nil {
 			failures = append(failures, ref.ID+":"+reason)
-			m.Store.Event(ctx, owner, r.Project, r.Paper, "provider_failover", map[string]any{"provider": ref.ID, "reason": reason})
+			m.Store.Event(ctx, owner, r.Course, r.Lesson, "provider_failover", map[string]any{"provider": ref.ID, "reason": reason})
 			continue
 		}
 		section.Image = ""
 		return Result{Section: section, Provider: ref.ID, Model: effectiveModel, Cost: 0, Mode: "model"}, nil
 	}
-	m.Store.Event(ctx, owner, r.Project, r.Paper, "providers_exhausted", failures)
+	m.Store.Event(ctx, owner, r.Course, r.Lesson, "providers_exhausted", failures)
 	return Result{}, domain.ErrPaused
 }
 

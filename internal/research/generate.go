@@ -15,11 +15,11 @@ import (
 // passages behind them (in page order) and images of those pages, so the
 // model reads equations, tables and figures as printed.
 
-// RelatedSection is the paper's own related work.
+// RelatedSection is the lesson's own related work.
 const RelatedSection = 6
 
 // SectionOrder is the order sections appear in readers and decks: related
-// work follows the motivation, as in most papers.
+// work follows the motivation, as in most lessons.
 var SectionOrder = []int{0, RelatedSection, 1, 2, 3, 4, 5}
 
 // Budget sizes the evidence for one section and, for readers, its length.
@@ -160,11 +160,11 @@ func (r Request) Evidence() (passages []domain.Unit, pages []domain.Unit) {
 
 var levelGuides = map[string]string{
 	"beginner":     "The reader is new to the field: explain the background and intuition first, define every technical term when it first appears, and walk through each equation slowly.",
-	"intermediate": "The reader knows the field's basics: explain the paper's ideas and design choices clearly, define the paper's own terms, and explain each equation's symbols and intuition.",
+	"intermediate": "The reader knows the field's basics: explain the lesson's ideas and design choices clearly, define the lesson's own terms, and explain each equation's symbols and intuition.",
 	"advanced":     "The reader is an expert: focus on technical details, assumptions, design trade-offs and a critical reading, without basic background.",
 }
 var audienceGuides = map[string]string{
-	"classmates": "The audience is classmates in a paper-reading seminar: make the ideas easy to follow.",
+	"classmates": "The audience is classmates in a lesson-reading seminar: make the ideas easy to follow.",
 	"advisor":    "The audience is the presenter's advisor: be precise and technical, and point out assumptions and weaknesses.",
 	"crossField": "The audience comes from other fields: explain background and terms in plain language before the details.",
 }
@@ -234,9 +234,9 @@ func (r Request) Prompt(passages, pages []domain.Unit) string {
 	}
 	switch r.Index {
 	case 2:
-		b.WriteString("Follow the order in which the paper presents its method (the passages are in page order): the overview or architecture first, then every component or stage in turn with its inputs, outputs, how it works and its key equations. Do not skip components, and do not reorder them.\n")
+		b.WriteString("Follow the order in which the lesson presents its method (the passages are in page order): the overview or architecture first, then every component or stage in turn with its inputs, outputs, how it works and its key equations. Do not skip components, and do not reorder them.\n")
 	case RelatedSection:
-		b.WriteString("Write about related work only as this paper discusses it (its related work or background section and the baselines it compares against): group the prior approaches into categories, name the representative works the paper cites, and explain how this paper differs from each category and why. Do not compare with papers outside these sources. If the sources say nothing about related work, say so in one sentence.\n")
+		b.WriteString("Write about related work only as this lesson discusses it (its related work or background section and the baselines it compares against): group the prior approaches into categories, name the representative works the lesson cites, and explain how this lesson differs from each category and why. Do not compare with lessons outside these sources. If the sources say nothing about related work, say so in one sentence.\n")
 	case 4:
 		b.WriteString("Report the main results with their numbers exactly as written, what they are compared against and under which settings, and the ablations and analyses that explain them.\n")
 	}
@@ -244,8 +244,8 @@ func (r Request) Prompt(passages, pages []domain.Unit) string {
 	switch r.Kind {
 	case "A":
 		budget := BudgetFor("A", r.Settings.Depth)
-		fmt.Fprintf(&b, "\nThis is one chapter of an illustrated reader that explains the paper. Write connected explanatory prose: paragraphs of 3 to 6 sentences, grouped under 2 to 5 **subheadings**, with \"- \" bullets only for genuine lists (steps, datasets, baselines). Length: about %s in the body; do not stop short. ", span(budget.BodyMin, budget.BodyMax))
-		b.WriteString("Explain each equation: what it computes, what every symbol means and the intuition behind it. When a figure or table of the paper shows the point, refer to it by its number as the paper does (e.g. Figure 3) and say what it shows. ")
+		fmt.Fprintf(&b, "\nThis is one chapter of an illustrated reader that explains the lesson. Write connected explanatory prose: paragraphs of 3 to 6 sentences, grouped under 2 to 5 **subheadings**, with \"- \" bullets only for genuine lists (steps, datasets, baselines). Length: about %s in the body; do not stop short. ", span(budget.BodyMin, budget.BodyMax))
+		b.WriteString("Explain each equation: what it computes, what every symbol means and the intuition behind it. When a figure or table of the lesson shows the point, refer to it by its number as the lesson does (e.g. Figure 3) and say what it shows. ")
 		if guide := levelGuides[r.Settings.Level]; guide != "" {
 			b.WriteString(guide)
 		}
@@ -261,7 +261,7 @@ func (r Request) Prompt(passages, pages []domain.Unit) string {
 			total += c
 		}
 		notes := int(math.Max(100, math.Min(450, float64(minutes)*260*0.8/float64(total+2))))
-		fmt.Fprintf(&b, "\nThis topic is part of a %d-minute talk. Write it as exactly %d %s, in the paper's order, each covering a different part; the talk's length depends on it. ", minutes, n, map[bool]string{true: "slide", false: "slides"}[n == 1])
+		fmt.Fprintf(&b, "\nThis topic is part of a %d-minute talk. Write it as exactly %d %s, in the lesson's order, each covering a different part; the talk's length depends on it. ", minutes, n, map[bool]string{true: "slide", false: "slides"}[n == 1])
 		b.WriteString("Each slide has a specific title naming its content (not just the section name), at most 18 Chinese characters or 10 English words; a body of 3 to 5 \"- \" bullets, each at most 30 Chinese characters or 16 English words, with concrete content (names, numbers, equations in plain text) and no paragraphs or subheadings; and the passages it uses in citations — figures from a slide's cited pages are placed on that slide, so cite the page whose figure the slide discusses. ")
 		fmt.Fprintf(&b, "In notes write the presenter's speaker script for the slide: natural spoken sentences addressed to the audience, about %s, explaining the points and what the figure shows and ending with a short transition; no subheadings, bullets or labels. ", span(notes*4/5, notes*6/5))
 		if guide := audienceGuides[r.Settings.Audience]; guide != "" {

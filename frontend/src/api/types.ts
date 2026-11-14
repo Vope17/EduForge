@@ -23,12 +23,12 @@ export interface PreferenceData {
 }
 
 /**
- * GET /api/summary: every record list of the current project plus the
+ * GET /api/summary: every record list of the current course plus the
  * user-wide lists. Go writes an empty list as null.
  */
 export interface Summary {
-  project?: Rec<D.Project>
-  paper?: Rec<D.Paper>[] | null
+  course?: Rec<D.Course>
+  lesson?: Rec<D.Lesson>[] | null
   source?: Rec<D.Source>[] | null
   knowledge?: Rec<D.Knowledge>[] | null
   request?: Rec<D.Request>[] | null
@@ -37,7 +37,7 @@ export interface Summary {
   task?: Rec<D.Task>[] | null
   step?: Rec<D.Step>[] | null
   artifact?: Rec<D.Artifact>[] | null
-  folder?: Rec<D.Folder>[] | null
+  chapter?: Rec<D.Chapter>[] | null
   event?: Rec<EventData>[] | null
   profile?: Rec<D.Profile>[] | null
   profile_version?: Rec<D.ProfileVersion>[] | null

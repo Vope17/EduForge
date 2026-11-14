@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useWorkspace } from '../../lib/workspace.ts'
-import { paperSteps } from '../../lib/status.ts'
-import type { Paper, Rec } from '../../api/types.ts'
-const props = defineProps<{ paper: Rec<Paper>; labelled?: boolean }>()
+import { lessonSteps } from '../../lib/status.ts'
+import type { Lesson, Rec } from '../../api/types.ts'
+const props = defineProps<{ lesson: Rec<Lesson>; labelled?: boolean }>()
 const { state, t } = useWorkspace()
-const steps = computed(() => paperSteps(props.paper, state.snapshot))
+const steps = computed(() => lessonSteps(props.lesson, state.snapshot))
 </script>
 
 <template>

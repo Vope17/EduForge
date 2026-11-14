@@ -3,11 +3,11 @@ import { computed } from 'vue'
 import { useWorkspace } from '../../lib/workspace.ts'
 import type { Rec, Task } from '../../api/types.ts'
 const props = defineProps<{ task: Rec<Task>; compact?: boolean }>()
-const { state, t, api, act, explain, openPaper } = useWorkspace()
+const { state, t, api, act, explain, openLesson } = useWorkspace()
 const d = computed(() => props.task.data)
 const label = computed(() => d.value.type === 'parse' ? t('parseType')
   : d.value.type.startsWith('preview:') ? t('previews') + ' · ' + d.value.type.slice(8) : t(d.value.type))
-const paper = computed(() => (state.snapshot.paper || []).find(x => x.id === props.task.paper_id))
+const lesson = computed(() => (state.snapshot.lesson || []).find(x => x.id === props.task.lesson_id))
 const tone = computed(() => d.value.status === 'completed' ? 'success' : ['failed', 'paused'].includes(d.value.status) ? 'warning' : '')
 async function control(action: string) { await act(() => api(`/tasks/${props.task.id}/control`, { method: 'POST', body: { action } })) }
 </script>
@@ -18,7 +18,7 @@ async function control(action: string) { await act(() => api(`/tasks/${props.tas
     <div class="grow">
       <strong>{{ label }}</strong>
       <p v-if="!compact" class="caption">
-        <button v-if="paper" class="text-button inline" @click="openPaper(paper.id); state.drawer = false">{{ paper.data.title }}</button>
+        <button v-if="lesson" class="text-button inline" @click="openLesson(lesson.id); state.drawer = false">{{ lesson.data.title }}</button>
         · {{ d.language || '—' }} · {{ task.id.slice(0, 8) }}
       </p>
       <progress :value="d.completed" :max="d.total || 1"></progress>

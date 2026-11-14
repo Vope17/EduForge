@@ -1,8 +1,8 @@
 import { computed, reactive, provide, inject, type InjectionKey } from 'vue'
 import { t, errorText } from './i18n.ts'
 import { createRouter, type Step } from './router.ts'
-import { paperSteps, nextStep } from './status.ts'
-import type { ModelOption, Project, Provider, Rec, Session, Summary } from '../api/types.ts'
+import { lessonSteps, nextStep } from './status.ts'
+import type { ModelOption, Course, Provider, Rec, Session, Summary } from '../api/types.ts'
 
 const MODEL_KINDS = ['codex', 'claude-cli', 'openai', 'anthropic']
 
@@ -21,10 +21,10 @@ export interface Connection {
 export interface WorkspaceState {
   language: string
   session: Session | null
-  projectID: string
-  paperID: string
+  courseID: string
+  lessonID: string
   selected: string[]
-  projects: Rec<Project>[]
+  courses: Rec<Course>[]
   snapshot: Summary
   busy: number
   error: string
@@ -50,8 +50,8 @@ function storedLanguage() {
 export function createWorkspace() {
   const { route, go } = createRouter()
   const state = reactive<WorkspaceState>({
-    language: storedLanguage(), session: null, projectID: '', paperID: '', selected: [],
-    projects: [], snapshot: {}, busy: 0, error: '', toast: '', drawer: false, nav: false,
+    language: storedLanguage(), session: null, courseID: '', lessonID: '', selected: [],
+    courses: [], snapshot: {}, busy: 0, error: '', toast: '', drawer: false, nav: false,
     connection: { checking: true, ready: false, mode: 'none', provider: '', model: '', errors: {} },
     models: {},
   })
@@ -74,17 +74,17 @@ export function createWorkspace() {
 
   async function refresh() {
     const version = ++refreshVersion
-    const projects = await api<Rec<Project>[]>('/projects')
-    const wanted = route.project || state.projectID
-    const projectID = projects.some(project => project.id === wanted) ? wanted : projects[0]?.id || ''
-    const snapshot = await api<Summary>('/summary' + (projectID ? `?project_id=${projectID}` : ''))
+    const courses = await api<Rec<Course>[]>('/courses')
+    const wanted = route.course || state.courseID
+    const courseID = courses.some(course => course.id === wanted) ? wanted : courses[0]?.id || ''
+    const snapshot = await api<Summary>('/summary' + (courseID ? `?course_id=${courseID}` : ''))
     if (version !== refreshVersion) return
-    state.projects = projects
-    state.projectID = projectID
+    state.courses = courses
+    state.courseID = courseID
     state.snapshot = snapshot
-    const paperIDs = new Set((snapshot.paper || []).map(p => p.id))
-    state.selected = state.selected.filter(id => paperIDs.has(id))
-    if (state.paperID && !paperIDs.has(state.paperID)) state.paperID = ''
+    const lessonIDs = new Set((snapshot.lesson || []).map(p => p.id))
+    state.selected = state.selected.filter(id => lessonIDs.has(id))
+    if (state.lessonID && !lessonIDs.has(state.lessonID)) state.lessonID = ''
   }
 
   // Runs a change, then reloads the summary; shows the error instead of throwing.
@@ -160,8 +160,8 @@ export function createWorkspace() {
   }
 
   function fileURL(record: { id: string }, path: string) { return `/api/files/${record.id}?path=${encodeURIComponent(path)}` }
-  const paper = computed(() => (state.snapshot.paper || []).find(x => x.id === state.paperID))
-  const knowledge = computed(() => (state.snapshot.knowledge || []).find(x => x.id === paper.value?.data.knowledge_id))
+  const lesson = computed(() => (state.snapshot.lesson || []).find(x => x.id === state.lessonID))
+  const knowledge = computed(() => (state.snapshot.knowledge || []).find(x => x.id === lesson.value?.data.knowledge_id))
   function citationLabel(id: string) {
     for (const source of state.snapshot.source || []) {
       const unit = source.data.parsed?.units?.find(x => x.id === id)
@@ -171,14 +171,14 @@ export function createWorkspace() {
   }
   const explain = (code: string) => errorText(code, state.language)
   // Without an explicit step, open the step that needs attention next.
-  function openPaper(id: string, step?: Step) {
-    const target = (state.snapshot.paper || []).find(p => p.id === id)
-    go({ name: 'paper', project: state.projectID, paper: id, step: step || nextStep(paperSteps(target, state.snapshot)) })
+  function openLesson(id: string, step?: Step) {
+    const target = (state.snapshot.lesson || []).find(p => p.id === id)
+    go({ name: 'lesson', course: state.courseID, lesson: id, step: step || nextStep(lessonSteps(target, state.snapshot)) })
   }
 
   const workspace = {
-    state, route, go, t: tr, api, refresh, act, init, setLanguage, notify, fileURL, paper, knowledge,
-    citationLabel, explain, providers, loadModels, checkConnections, openPaper,
+    state, route, go, t: tr, api, refresh, act, init, setLanguage, notify, fileURL, lesson, knowledge,
+    citationLabel, explain, providers, loadModels, checkConnections, openLesson,
   }
   provide(key, workspace)
   return workspace

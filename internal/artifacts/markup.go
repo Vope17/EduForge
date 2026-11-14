@@ -196,10 +196,10 @@ func SectionFigures(a domain.Artifact, k domain.Knowledge) [][]domain.Image {
 	return out
 }
 
-// PaperNames lists the distinct research documents behind the knowledge by
+// LessonNames lists the distinct research documents behind the knowledge by
 // their own titles (from the PDF, or read off its pages when the knowledge is
 // AI-written), else their file names without the extension.
-func PaperNames(k domain.Knowledge) []string {
+func LessonNames(k domain.Knowledge) []string {
 	names := []string{}
 	seen := map[string]bool{}
 	for _, u := range k.Units {
@@ -219,9 +219,9 @@ func PaperNames(k domain.Knowledge) []string {
 	return names
 }
 
-// DocumentTitle heads a reader: the papers' own names, else the knowledge title.
+// DocumentTitle heads a reader: the lessons' own names, else the knowledge title.
 func DocumentTitle(k domain.Knowledge) string {
-	if names := PaperNames(k); len(names) > 0 {
+	if names := LessonNames(k); len(names) > 0 {
 		return strings.Join(names, " / ")
 	}
 	return k.Title
@@ -403,7 +403,7 @@ func PlaceFigures(body string, figures []domain.Image) [][]domain.Image {
 	return out
 }
 
-// figureCaption is the paper's own caption ("Figure 5: …"); figures without
+// figureCaption is the lesson's own caption ("Figure 5: …"); figures without
 // one are shown uncaptioned rather than with a source label.
 func figureCaption(img domain.Image) string {
 	return img.Caption

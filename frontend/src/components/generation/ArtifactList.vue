@@ -9,10 +9,10 @@ const { state, t, api, act } = useWorkspace()
 const editingID = ref('')
 const editing = computed(() => (state.snapshot.artifact || []).find(x => x.id === editingID.value))
 function open(artifact: Rec<Artifact>) { editingID.value = artifact.id }
-function studyTitle(id: string) { return (state.snapshot.paper || []).find(x => x.id === id)?.data.title || id }
+function studyTitle(id: string) { return (state.snapshot.lesson || []).find(x => x.id === id)?.data.title || id }
 // Group versions: newest artifact per (type, language, grouping) first.
 // The server's "delete all versions" uses the same key.
-const outputKey = (a: Rec<Artifact>) => [a.data.type, a.data.language, (a.data.grouped_paper_ids || []).join(',')].join('|')
+const outputKey = (a: Rec<Artifact>) => [a.data.type, a.data.language, (a.data.grouped_lesson_ids || []).join(',')].join('|')
 const latest = computed(() => {
   const seen = new Set<string>()
   return props.artifacts.filter(a => {
@@ -49,7 +49,7 @@ const older = computed(() => props.artifacts.filter(a => !latest.value.includes(
         <div class="form-row">
           <span class="output-letter small-letter">{{ artifact.data.type }}</span>
         </div>
-        <h3>{{ artifact.data.grouped_paper_ids?.length ? artifact.data.grouped_paper_ids.map(studyTitle).join(' / ') : t(artifact.data.type) }}</h3>
+        <h3>{{ artifact.data.grouped_lesson_ids?.length ? artifact.data.grouped_lesson_ids.map(studyTitle).join(' / ') : t(artifact.data.type) }}</h3>
         <p class="caption">{{ artifact.data.language }} · v{{ artifact.version }} · {{ new Date(artifact.created_at).toLocaleString(state.language) }}</p>
         <p v-if="artifact.data.mode === 'source-extract'" class="draft-notice">{{ t('extractive') }}</p>
         <p v-if="artifact.data.type === 'B'" class="caption">{{ t('estimatedTime') }}: {{ artifact.data.estimated_minutes?.toFixed(1) }} min</p>

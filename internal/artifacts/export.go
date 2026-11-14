@@ -101,7 +101,7 @@ func HTML(s *store.Store, a domain.Artifact, k domain.Knowledge) ([]byte, error)
 		}
 		out.WriteString("</section>")
 	}
-	if names := PaperNames(k); len(names) > 0 {
+	if names := LessonNames(k); len(names) > 0 {
 		fmt.Fprintf(&out, `<section class="references"><h2>%s</h2><ol>`, referencesTitle(a.Language))
 		for _, name := range names {
 			fmt.Fprintf(&out, "<li>%s</li>", html.EscapeString(name))
@@ -120,7 +120,7 @@ func documentKicker(a domain.Artifact) string {
 		if zh {
 			return "論文導讀"
 		}
-		return "Paper reading guide"
+		return "Lesson reading guide"
 	case "B":
 		if zh {
 			return "簡報講稿"

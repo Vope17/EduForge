@@ -116,7 +116,7 @@ func TestSlideFormulaIsAPictureAboveThePoints(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	deck := BuildDeck([]domain.Section{{Title: "Ranking", Body: "- score $e(f)$\n- more", Citations: []string{"s:p1"}, Equation: `e(f) = \prod_i c_i`}}, domain.Knowledge{}, "Paper", "en", nil, DefaultGeometry())
+	deck := BuildDeck([]domain.Section{{Title: "Ranking", Body: "- score $e(f)$\n- more", Citations: []string{"s:p1"}, Equation: `e(f) = \prod_i c_i`}}, domain.Knowledge{}, "Lesson", "en", nil, DefaultGeometry())
 	slide := deck[1]
 	formula, points := slide.Layout[1], slide.Layout[2]
 	if formula.Kind != "formula" || formula.Tex != `e(f) = \prod_i c_i` || points.Y < formula.Y+formula.H {

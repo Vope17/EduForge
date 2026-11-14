@@ -31,7 +31,7 @@ func TestPDFTitle(t *testing.T) {
 	if got := pdfTitle(info); got != "AIDA: Accelerating Root Cause Analysis for Multi-Vendor Device Failures" {
 		t.Fatalf("got %q", got)
 	}
-	for _, junk := range []string{"Title: paper.pdf", "Title: Microsoft Word - draft.docx", "Title: untitled document", "Title: main", "Title:   "} {
+	for _, junk := range []string{"Title: lesson.pdf", "Title: Microsoft Word - draft.docx", "Title: untitled document", "Title: main", "Title:   "} {
 		if got := pdfTitle(junk); got != "" {
 			t.Errorf("pdfTitle(%q) = %q, want empty", junk, got)
 		}

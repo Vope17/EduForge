@@ -69,8 +69,8 @@ func (a *App) writeKnowledge(ctx context.Context, owner string, k domain.Knowled
 
 // RewriteKnowledge has a model write a new version of a study's shared
 // knowledge from its parsed sources. The new version needs reviewing again.
-func (a *App) RewriteKnowledge(ctx context.Context, owner, paperID string, expected int) (domain.Record, error) {
-	paper, p, err := get[domain.Paper](ctx, a, owner, paperID, "paper")
+func (a *App) RewriteKnowledge(ctx context.Context, owner, lessonID string, expected int) (domain.Record, error) {
+	lesson, p, err := get[domain.Lesson](ctx, a, owner, lessonID, "lesson")
 	if err != nil {
 		return domain.Record{}, err
 	}
@@ -87,16 +87,16 @@ func (a *App) RewriteKnowledge(ctx context.Context, owner, paperID string, expec
 	}
 	k.Confirmed = false
 	k.Edits = oldK.Edits + 1
-	r, err := a.Store.Create(ctx, domain.Record{Owner: owner, Kind: "knowledge", Parent: paperID, Project: paper.Project, Paper: paperID, Version: old.Version + 1, Data: domain.Encode(k)})
+	r, err := a.Store.Create(ctx, domain.Record{Owner: owner, Kind: "knowledge", Parent: lessonID, Course: lesson.Course, Lesson: lessonID, Version: old.Version + 1, Data: domain.Encode(k)})
 	if err != nil {
 		return r, err
 	}
-	_, err = set[domain.Paper](ctx, a, owner, paperID, paper.Version, func(p *domain.Paper) error {
+	_, err = set[domain.Lesson](ctx, a, owner, lessonID, lesson.Version, func(p *domain.Lesson) error {
 		p.KnowledgeID = r.ID
 		return nil
 	})
 	if err == nil {
-		a.Store.Event(ctx, owner, paper.Project, paperID, "knowledge_written_by_ai", map[string]any{"previous": old.ID, "current": r.ID, "claims": len(k.Claims)})
+		a.Store.Event(ctx, owner, lesson.Course, lessonID, "knowledge_written_by_ai", map[string]any{"previous": old.ID, "current": r.ID, "claims": len(k.Claims)})
 	}
 	return r, err
 }

@@ -13,7 +13,7 @@ import (
 
 func TestTemplateEditsAreVersionedAndRestorable(t *testing.T) {
 	ctx := context.Background()
-	a, owner, project, _ := fixture(t)
+	a, owner, course, _ := fixture(t)
 	b, err := os.ReadFile("../../tests/fixtures/template.potx")
 	if err != nil {
 		t.Fatal(err)
@@ -47,7 +47,7 @@ func TestTemplateEditsAreVersionedAndRestorable(t *testing.T) {
 		t.Fatalf("a stale save should conflict, got %v", err)
 	}
 
-	archive, err := a.Export(ctx, owner, project.ID, true)
+	archive, err := a.Export(ctx, owner, course.ID, true)
 	if err != nil {
 		t.Fatal(err)
 	}

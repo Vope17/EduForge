@@ -6,31 +6,31 @@ export interface DomainRecord {
   owner_user_id: string
   kind: string
   parent_id?: string
-  project_id?: string
-  paper_id?: string
+  course_id?: string
+  lesson_id?: string
   version: number
   data: unknown
   created_at: string
   updated_at: string
 }
 
-export interface Project {
+export interface Course {
   name: string
   description: string
   style: Record<string, Style> | null
 }
 
-/** Folder groups studies in a project's research library (one level). */
-export interface Folder {
+/** Chapter groups studies in a course's research library (one level). */
+export interface Chapter {
   name: string
 }
 
-export interface Paper {
+export interface Lesson {
   title: string
   repo: string
   group: string
-  /** Folder is the library folder holding the study; empty is unfiled. */
-  folder?: string
+  /** Chapter is the library chapter holding the study; empty is unfiled. */
+  chapter?: string
   knowledge_id: string
   settings: OutputSettings
 }
@@ -212,8 +212,8 @@ export interface ProviderRef {
 }
 
 export interface Request {
-  paper_ids: string[] | null
-  use_paper_settings?: boolean
+  lesson_ids: string[] | null
+  use_lesson_settings?: boolean
   targets?: GenerationTarget[]
   selected: string[] | null
   languages: Record<string, string> | null
@@ -233,7 +233,7 @@ export interface Request {
 }
 
 export interface GenerationTarget {
-  paper_id: string
+  lesson_id: string
   knowledge_id: string
   settings: OutputSettings
   template_style?: Style
@@ -249,7 +249,7 @@ export interface Task {
   language: string
   knowledge_id: string
   related_knowledge_ids?: string[]
-  grouped_paper_ids?: string[]
+  grouped_lesson_ids?: string[]
   settings: OutputSettings
   style_snapshot: StyleSnapshot
   read_terms: string[] | null
@@ -294,7 +294,7 @@ export interface Section {
   slides?: Section[]
   /** Equation is a slide's key formula in TeX, shown above its points. */
   equation?: string
-  /** Part is the paper section a slide presents (decks follow the paper). */
+  /** Part is the lesson section a slide presents (decks follow the lesson). */
   part?: string
 }
 
@@ -333,7 +333,7 @@ export interface Artifact {
   language: string
   knowledge_id: string
   related_knowledge_ids?: string[]
-  grouped_paper_ids?: string[]
+  grouped_lesson_ids?: string[]
   request_id: string
   task_id: string
   style_snapshot: StyleSnapshot

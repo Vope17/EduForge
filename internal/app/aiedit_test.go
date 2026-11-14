@@ -12,11 +12,11 @@ import (
 
 func TestSuggestEditsReturnsCheckedProposalsWithoutSaving(t *testing.T) {
 	ctx := context.Background()
-	a, owner, project, paper := fixture(t)
-	p, _ := domain.Decode[domain.Paper](paper.Data)
+	a, owner, course, lesson := fixture(t)
+	p, _ := domain.Decode[domain.Lesson](lesson.Data)
 	_, k, _ := get[domain.Knowledge](ctx, a, owner, p.KnowledgeID, "knowledge")
 	cite := k.Units[0].ID
-	art, err := a.create(ctx, owner, "artifact", paper.ID, project.ID, paper.ID, domain.Artifact{Type: "B", Language: "zh-TW", KnowledgeID: p.KnowledgeID, Sections: []domain.Section{{Title: "方法", Body: "最近質心分類", Citations: []string{cite}}}})
+	art, err := a.create(ctx, owner, "artifact", lesson.ID, course.ID, lesson.ID, domain.Artifact{Type: "B", Language: "zh-TW", KnowledgeID: p.KnowledgeID, Sections: []domain.Section{{Title: "方法", Body: "最近質心分類", Citations: []string{cite}}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,16 +55,16 @@ func TestSuggestEditsReturnsCheckedProposalsWithoutSaving(t *testing.T) {
 			t.Fatalf("prompt should mention %q", want)
 		}
 	}
-	if n := count(t, a, owner, store.Filter{Kind: "artifact", Paper: paper.ID}); n != 1 {
+	if n := count(t, a, owner, store.Filter{Kind: "artifact", Lesson: lesson.ID}); n != 1 {
 		t.Fatalf("suggestions must not create versions, found %d artifacts", n)
 	}
 }
 
 func TestSuggestEditsValidatesInputAndNeedsAModel(t *testing.T) {
 	ctx := context.Background()
-	a, owner, project, paper := fixture(t)
-	p, _ := domain.Decode[domain.Paper](paper.Data)
-	art, err := a.create(ctx, owner, "artifact", paper.ID, project.ID, paper.ID, domain.Artifact{Type: "A", Language: "en", KnowledgeID: p.KnowledgeID})
+	a, owner, course, lesson := fixture(t)
+	p, _ := domain.Decode[domain.Lesson](lesson.Data)
+	art, err := a.create(ctx, owner, "artifact", lesson.ID, course.ID, lesson.ID, domain.Artifact{Type: "A", Language: "en", KnowledgeID: p.KnowledgeID})
 	if err != nil {
 		t.Fatal(err)
 	}

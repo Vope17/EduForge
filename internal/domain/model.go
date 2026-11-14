@@ -40,29 +40,29 @@ type Record struct {
 	Owner   string          `json:"owner_user_id"`
 	Kind    string          `json:"kind"`
 	Parent  string          `json:"parent_id,omitempty"`
-	Project string          `json:"project_id,omitempty"`
-	Paper   string          `json:"paper_id,omitempty"`
+	Course  string          `json:"course_id,omitempty"`
+	Lesson  string          `json:"lesson_id,omitempty"`
 	Version int             `json:"version"`
 	Data    json.RawMessage `json:"data"`
 	Created string          `json:"created_at"`
 	Updated string          `json:"updated_at"`
 }
-type Project struct {
+type Course struct {
 	Name        string           `json:"name"`
 	Description string           `json:"description"`
 	Style       map[string]Style `json:"style"`
 }
 
-// Folder groups studies in a project's research library (one level).
-type Folder struct {
+// Chapter groups studies in a course's research library (one level).
+type Chapter struct {
 	Name string `json:"name"`
 }
-type Paper struct {
+type Lesson struct {
 	Title string `json:"title"`
 	Repo  string `json:"repo"`
 	Group string `json:"group"`
-	// Folder is the library folder holding the study; empty is unfiled.
-	Folder      string         `json:"folder,omitempty"`
+	// Chapter is the library chapter holding the study; empty is unfiled.
+	Chapter     string         `json:"chapter,omitempty"`
 	KnowledgeID string         `json:"knowledge_id"`
 	Settings    OutputSettings `json:"settings"`
 }
@@ -216,27 +216,27 @@ type ProviderRef struct {
 	Provider Provider `json:"provider"`
 }
 type Request struct {
-	PaperIDs         []string           `json:"paper_ids"`
-	UsePaperSettings bool               `json:"use_paper_settings,omitempty"`
-	Targets          []GenerationTarget `json:"targets,omitempty"`
-	Selected         []string           `json:"selected"`
-	Languages        map[string]string  `json:"languages"`
-	UILanguage       string             `json:"ui_language"`
-	Settings         OutputSettings     `json:"settings"`
-	ProfileID        string             `json:"profile_id"`
-	Overrides        map[string]Style   `json:"overrides"`
-	AllowPaid        bool               `json:"allow_paid"`
-	Unlimited        bool               `json:"unlimited"`
-	Budget           *float64           `json:"budget"`
-	Spent            float64            `json:"spent"`
-	Providers        []ProviderRef      `json:"providers"`
-	Status           string             `json:"status"`
-	PreviewIDs       []string           `json:"preview_ids"`
-	Started          string             `json:"started_at"`
-	Style            StyleSnapshot      `json:"style_snapshot"`
+	LessonIDs         []string           `json:"lesson_ids"`
+	UseLessonSettings bool               `json:"use_lesson_settings,omitempty"`
+	Targets           []GenerationTarget `json:"targets,omitempty"`
+	Selected          []string           `json:"selected"`
+	Languages         map[string]string  `json:"languages"`
+	UILanguage        string             `json:"ui_language"`
+	Settings          OutputSettings     `json:"settings"`
+	ProfileID         string             `json:"profile_id"`
+	Overrides         map[string]Style   `json:"overrides"`
+	AllowPaid         bool               `json:"allow_paid"`
+	Unlimited         bool               `json:"unlimited"`
+	Budget            *float64           `json:"budget"`
+	Spent             float64            `json:"spent"`
+	Providers         []ProviderRef      `json:"providers"`
+	Status            string             `json:"status"`
+	PreviewIDs        []string           `json:"preview_ids"`
+	Started           string             `json:"started_at"`
+	Style             StyleSnapshot      `json:"style_snapshot"`
 }
 type GenerationTarget struct {
-	PaperID       string         `json:"paper_id"`
+	LessonID      string         `json:"lesson_id"`
 	KnowledgeID   string         `json:"knowledge_id"`
 	Settings      OutputSettings `json:"settings"`
 	TemplateStyle Style          `json:"template_style,omitempty"`
@@ -251,7 +251,7 @@ type Task struct {
 	Language         string         `json:"language"`
 	KnowledgeID      string         `json:"knowledge_id"`
 	RelatedKnowledge []string       `json:"related_knowledge_ids,omitempty"`
-	GroupedPapers    []string       `json:"grouped_paper_ids,omitempty"`
+	GroupedLessons   []string       `json:"grouped_lesson_ids,omitempty"`
 	Settings         OutputSettings `json:"settings"`
 	Style            StyleSnapshot  `json:"style_snapshot"`
 	ReadTerms        []string       `json:"read_terms"`
@@ -288,7 +288,7 @@ type Section struct {
 	Slides []Section `json:"slides,omitempty"`
 	// Equation is a slide's key formula in TeX, shown above its points.
 	Equation string `json:"equation,omitempty"`
-	// Part is the paper section a slide presents (decks follow the paper).
+	// Part is the lesson section a slide presents (decks follow the lesson).
 	Part string `json:"part,omitempty"`
 }
 
@@ -321,7 +321,7 @@ type Artifact struct {
 	Language         string         `json:"language"`
 	KnowledgeID      string         `json:"knowledge_id"`
 	RelatedKnowledge []string       `json:"related_knowledge_ids,omitempty"`
-	GroupedPapers    []string       `json:"grouped_paper_ids,omitempty"`
+	GroupedLessons   []string       `json:"grouped_lesson_ids,omitempty"`
 	RequestID        string         `json:"request_id"`
 	TaskID           string         `json:"task_id"`
 	Style            StyleSnapshot  `json:"style_snapshot"`

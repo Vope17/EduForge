@@ -5,11 +5,11 @@ import { ACTIVE } from '../../lib/status.ts'
 import Icon from '../Icon.vue'
 import TaskRow from '../tasks/TaskRow.vue'
 
-const { state, t, api, act, fileURL, paper, knowledge, openPaper, explain } = useWorkspace()
+const { state, t, api, act, fileURL, lesson, knowledge, openLesson, explain } = useWorkspace()
 const files = ref<File[]>([]), dragging = ref(false)
-const sources = computed(() => (state.snapshot.source || []).filter(x => x.paper_id === state.paperID))
+const sources = computed(() => (state.snapshot.source || []).filter(x => x.lesson_id === state.lessonID))
 const research = computed(() => sources.value.filter(x => x.data.role === 'research'))
-const parseTasks = computed(() => (state.snapshot.task || []).filter(x => x.paper_id === state.paperID && x.data.type === 'parse').slice().reverse())
+const parseTasks = computed(() => (state.snapshot.task || []).filter(x => x.lesson_id === state.lessonID && x.data.type === 'parse').slice().reverse())
 const parsing = computed(() => parseTasks.value.some(x => ACTIVE.includes(x.data.status)))
 const lastParse = computed(() => parseTasks.value[0])
 
@@ -21,14 +21,14 @@ async function upload() {
       const body = new FormData()
       body.append('file', file)
       body.append('role', 'research')
-      return api(`/papers/${state.paperID}/sources`, { method: 'POST', body })
+      return api(`/lessons/${state.lessonID}/sources`, { method: 'POST', body })
     }))
     files.value = []
     const failed = results.filter((x): x is PromiseRejectedResult => x.status === 'rejected')
     if (failed[0]) throw failed[0].reason
   })
 }
-async function parse() { await act(() => api(`/papers/${state.paperID}/parse`, { method: 'POST' })) }
+async function parse() { await act(() => api(`/lessons/${state.lessonID}/parse`, { method: 'POST' })) }
 </script>
 
 <template>
@@ -80,7 +80,7 @@ async function parse() { await act(() => api(`/papers/${state.paperID}/parse`, {
       <button class="primary" :disabled="!research.length || parsing || !!state.busy" @click="parse">
         {{ t(knowledge ? 'parseAgain' : 'parse') }} →
       </button>
-      <button v-if="knowledge" class="secondary" @click="openPaper(paper!.id, 'knowledge')">{{ t('goTo') }} {{ t('step_knowledge') }} →</button>
+      <button v-if="knowledge" class="secondary" @click="openLesson(lesson!.id, 'knowledge')">{{ t('goTo') }} {{ t('step_knowledge') }} →</button>
     </div>
   </section>
 </template>

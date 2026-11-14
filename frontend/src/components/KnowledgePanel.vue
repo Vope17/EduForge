@@ -37,12 +37,12 @@ function removePoint(index: number) { draft.value?.claims?.splice(index, 1); ope
 function addTerm() { (draft.value!.terms ||= []).push({ original: '', en: '', 'zh-TW': '', abbreviation: '', definition: '', citations: units.value[0] ? [units.value[0].id] : [], context: draft.value!.title }) }
 function sourceRecord(id: string) { return (state.snapshot.source || []).find(x => x.id === id) }
 
-async function save() { await act(() => api(`/papers/${state.paperID}/knowledge`, { method: 'PUT', body: { version: version.value, knowledge: draft.value } })) }
+async function save() { await act(() => api(`/lessons/${state.lessonID}/knowledge`, { method: 'PUT', body: { version: version.value, knowledge: draft.value } })) }
 const writing = ref(false)
 async function rewrite() {
   if ((dirty.value || byAI.value) && !confirm(t(dirty.value ? 'knowledgeRewriteDiscard' : 'knowledgeRewriteConfirm'))) return
   writing.value = true
-  await act(() => api(`/papers/${state.paperID}/knowledge/ai`, { method: 'POST', body: { version: version.value } }))
+  await act(() => api(`/lessons/${state.lessonID}/knowledge/ai`, { method: 'POST', body: { version: version.value } }))
   writing.value = false
 }
 const rows = (text: string | undefined) => Math.min(8, Math.max(2, Math.ceil((text || '').length / 60)))

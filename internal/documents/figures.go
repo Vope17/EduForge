@@ -18,7 +18,7 @@ import (
 	"eduforge/internal/store"
 )
 
-// Figures in papers are usually vector drawings, so extracting embedded bitmaps
+// Figures in lessons are usually vector drawings, so extracting embedded bitmaps
 // yields icons and masks rather than the figure. Instead, locate each
 // "Figure N" caption with pdftotext's layout boxes and crop the rendered page
 // region between the caption and the nearest body text above it.

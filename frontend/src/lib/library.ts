@@ -1,32 +1,32 @@
-// Library helpers: folders (one level per project).
+// Library helpers: chapters (one level per course).
 import { reactive } from 'vue'
-import type { Folder, Paper, Rec, Summary } from '../api/types.ts'
+import type { Chapter, Lesson, Rec, Summary } from '../api/types.ts'
 import type { Workspace } from './workspace.ts'
 
-export function folderList(snapshot: Summary): Rec<Folder>[] {
-  return (snapshot.folder || []).slice().sort((a, b) => a.data.name.localeCompare(b.data.name))
+export function chapterList(snapshot: Summary): Rec<Chapter>[] {
+  return (snapshot.chapter || []).slice().sort((a, b) => a.data.name.localeCompare(b.data.name))
 }
 
-export interface PaperGroup {
+export interface LessonGroup {
   key: string
-  folder: Rec<Folder> | null
-  papers: Rec<Paper>[]
+  chapter: Rec<Chapter> | null
+  lessons: Rec<Lesson>[]
 }
 
-// Groups papers by folder: every folder in name order, then unfiled studies.
-// A paper whose folder no longer exists counts as unfiled.
-export function groupPapers(papers: Rec<Paper>[], folders: Rec<Folder>[]): PaperGroup[] {
-  const ids = new Set(folders.map(f => f.id))
-  const groups: PaperGroup[] = folders.map(folder => ({ key: folder.id, folder, papers: papers.filter(p => p.data.folder === folder.id) }))
-  groups.push({ key: '', folder: null, papers: papers.filter(p => !ids.has(p.data.folder ?? '')) })
+// Groups lessons by chapter: every chapter in name order, then unfiled studies.
+// A lesson whose chapter no longer exists counts as unfiled.
+export function groupLessons(lessons: Rec<Lesson>[], chapters: Rec<Chapter>[]): LessonGroup[] {
+  const ids = new Set(chapters.map(f => f.id))
+  const groups: LessonGroup[] = chapters.map(chapter => ({ key: chapter.id, chapter, lessons: lessons.filter(p => p.data.chapter === chapter.id) }))
+  groups.push({ key: '', chapter: null, lessons: lessons.filter(p => !ids.has(p.data.chapter ?? '')) })
   return groups
 }
 
-const COLLAPSED_KEY = 'eduforge-collapsed-folders'
+const COLLAPSED_KEY = 'eduforge-collapsed-chapters'
 function loadCollapsed(): Record<string, boolean> {
   try { return JSON.parse(localStorage.getItem(COLLAPSED_KEY) || '{}') || {} } catch { return {} }
 }
-// Which folders are collapsed, remembered per browser.
+// Which chapters are collapsed, remembered per browser.
 export const collapsed = reactive(loadCollapsed())
 export function toggleCollapsed(id: string) {
   collapsed[id] = !collapsed[id]
@@ -34,31 +34,31 @@ export function toggleCollapsed(id: string) {
   try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify(collapsed)) } catch {}
 }
 
-// Folder and move actions bound to a workspace ({ state, api, act, t }).
+// Chapter and move actions bound to a workspace ({ state, api, act, t }).
 export function libraryActions({ state, api, act, t, go }: Pick<Workspace, 'state' | 'api' | 'act' | 't' | 'go'>) {
   return {
-    // Deletes the current project after a confirmation that names it.
-    async deleteProject() {
-      const project = state.projects.find(x => x.id === state.projectID)
-      if (!project || !confirm(t('deleteProject').replace('{name}', project.data.name))) return
-      const result = await act(() => api(`/projects/${project.id}?confirm=delete-project-data`, { method: 'DELETE' }))
-      if (result) go({ name: 'home', project: '' })
+    // Deletes the current course after a confirmation that names it.
+    async deleteCourse() {
+      const course = state.courses.find(x => x.id === state.courseID)
+      if (!course || !confirm(t('deleteCourse').replace('{name}', course.data.name))) return
+      const result = await act(() => api(`/courses/${course.id}?confirm=delete-course-data`, { method: 'DELETE' }))
+      if (result) go({ name: 'home', course: '' })
     },
-    async createFolder() {
-      const name = prompt(t('folderName'))?.trim()
-      if (name) await act(() => api(`/projects/${state.projectID}/folders`, { method: 'POST', body: { name } }))
+    async createChapter() {
+      const name = prompt(t('chapterName'))?.trim()
+      if (name) await act(() => api(`/courses/${state.courseID}/chapters`, { method: 'POST', body: { name } }))
     },
-    async renameFolder(folder: Rec<Folder>) {
-      const name = prompt(t('folderName'), folder.data.name)?.trim()
-      if (name && name !== folder.data.name) await act(() => api(`/folders/${folder.id}`, { method: 'PUT', body: { name } }))
+    async renameChapter(chapter: Rec<Chapter>) {
+      const name = prompt(t('chapterName'), chapter.data.name)?.trim()
+      if (name && name !== chapter.data.name) await act(() => api(`/chapters/${chapter.id}`, { method: 'PUT', body: { name } }))
     },
-    async deleteFolder(folder: Rec<Folder>) {
-      if (confirm(t('deleteFolderConfirm').replace('{name}', folder.data.name))) await act(() => api(`/folders/${folder.id}`, { method: 'DELETE' }))
+    async deleteChapter(chapter: Rec<Chapter>) {
+      if (confirm(t('deleteChapterConfirm').replace('{name}', chapter.data.name))) await act(() => api(`/chapters/${chapter.id}`, { method: 'DELETE' }))
     },
-    async movePaper(paperID: string, folderID: string) {
-      const paper = (state.snapshot.paper || []).find(p => p.id === paperID)
-      if (!paper || (paper.data.folder || '') === folderID) return
-      await act(() => api(`/papers/${paperID}/folder`, { method: 'PUT', body: { folder: folderID } }))
+    async moveLesson(lessonID: string, chapterID: string) {
+      const lesson = (state.snapshot.lesson || []).find(p => p.id === lessonID)
+      if (!lesson || (lesson.data.chapter || '') === chapterID) return
+      await act(() => api(`/lessons/${lessonID}/chapter`, { method: 'PUT', body: { chapter: chapterID } }))
     },
   }
 }

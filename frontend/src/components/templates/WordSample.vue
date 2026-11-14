@@ -23,8 +23,8 @@ function look(role: string) {
 }
 const margins = computed(() => props.spec.margins || { top: 25.4, bottom: 25.4, left: 25.4, right: 25.4 })
 const blocks: { role: string; text: string; bullet?: boolean }[] = [
-  { role: 'subtitle', text: '論文導讀 · Paper reading guide' },
-  { role: 'title', text: '論文題目 Paper title' },
+  { role: 'subtitle', text: '論文導讀 · Lesson reading guide' },
+  { role: 'title', text: '論文題目 Lesson title' },
   { role: 'h1', text: 'I.  研究動機與問題' },
   { role: 'normal', text: '這裡是讀本內文，套用模板的內文樣式。The reader text uses the body style.' },
   { role: 'normal', text: '• 重點一：標題與內文樣式', bullet: true },

@@ -11,7 +11,7 @@ function fixture() {
   db.exec(schema)
   db.prepare('INSERT INTO users VALUES(?,?,?,?)').run('alice', 'Alice', 1, 'now')
   db.prepare('INSERT INTO users VALUES(?,?,?,?)').run('bob', 'Bob', 0, 'now')
-  const add = (id, owner, kind, { parent = null, project = null, paper = null, data = {} } = {}) => db.prepare('INSERT INTO records VALUES(?,?,?,?,?,?,?,?,?,?)').run(id, owner, kind, parent, project, paper, 1, JSON.stringify(data), 'now', 'now')
+  const add = (id, owner, kind, { parent = null, course = null, lesson = null, data = {} } = {}) => db.prepare('INSERT INTO records VALUES(?,?,?,?,?,?,?,?,?,?)').run(id, owner, kind, parent, course, lesson, 1, JSON.stringify(data), 'now', 'now')
   return { db, add }
 }
 test('schema is idempotent and only one built-in local user is permitted', () => {
@@ -21,23 +21,23 @@ test('schema is idempotent and only one built-in local user is permitted', () =>
   assert.throws(() => db.prepare('INSERT INTO users VALUES(?,?,?,?)').run('second', 'Second', 1, 'now'), /UNIQUE/)
   db.close()
 })
-test('cross-user parent, project and paper links fail at the database boundary', () => {
+test('cross-user parent, course and lesson links fail at the database boundary', () => {
   const { db, add } = fixture()
-  add('project-a', 'alice', 'project')
-  add('paper-a', 'alice', 'paper', { parent: 'project-a', project: 'project-a' })
-  assert.throws(() => add('child-b', 'bob', 'source', { parent: 'paper-a' }), /FOREIGN KEY/)
-  assert.throws(() => add('project-b', 'bob', 'paper', { project: 'project-a' }), /FOREIGN KEY/)
-  assert.throws(() => add('paper-b', 'bob', 'source', { paper: 'paper-a' }), /FOREIGN KEY/)
+  add('course-a', 'alice', 'course')
+  add('lesson-a', 'alice', 'lesson', { parent: 'course-a', course: 'course-a' })
+  assert.throws(() => add('child-b', 'bob', 'source', { parent: 'lesson-a' }), /FOREIGN KEY/)
+  assert.throws(() => add('course-b', 'bob', 'lesson', { course: 'course-a' }), /FOREIGN KEY/)
+  assert.throws(() => add('lesson-b', 'bob', 'source', { lesson: 'lesson-a' }), /FOREIGN KEY/)
   db.close()
 })
-test('project deletion cascades to its branches and leaves personal memory intact', () => {
+test('course deletion cascades to its branches and leaves personal memory intact', () => {
   const { db, add } = fixture()
-  add('p', 'alice', 'project')
-  add('study', 'alice', 'paper', { parent: 'p', project: 'p' })
-  add('request', 'alice', 'request', { parent: 'p', project: 'p' })
-  add('task', 'alice', 'task', { parent: 'request', project: 'p', paper: 'study' })
-  add('artifact', 'alice', 'artifact', { parent: 'task', project: 'p', paper: 'study' })
-  add('read', 'alice', 'reading')
+  add('p', 'alice', 'course')
+  add('study', 'alice', 'lesson', { parent: 'p', course: 'p' })
+  add('request', 'alice', 'request', { parent: 'p', course: 'p' })
+  add('task', 'alice', 'task', { parent: 'request', course: 'p', lesson: 'study' })
+  add('artifact', 'alice', 'artifact', { parent: 'task', course: 'p', lesson: 'study' })
+  add('read', 'alice', 'preference')
   add('style', 'alice', 'profile')
   db.prepare('DELETE FROM records WHERE id=? AND owner_user_id=?').run('p', 'alice')
   assert.deepEqual(db.prepare('SELECT id FROM records ORDER BY id').all().map(x => x.id), ['read', 'style'])

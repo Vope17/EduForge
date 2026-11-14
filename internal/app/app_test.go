@@ -15,7 +15,7 @@ import (
 )
 
 func TestTextCannotAuthorizeAnotherUsersFile(t *testing.T) {
-	a, alice, project, _ := fixture(t)
+	a, alice, course, _ := fixture(t)
 	ctx := context.Background()
 	bob, err := a.Store.AddUser(ctx, "Bob")
 	if err != nil {
@@ -29,14 +29,14 @@ func TestTextCannotAuthorizeAnotherUsersFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = set[domain.Project](ctx, a, alice, project.ID, 0, func(p *domain.Project) error {
+	_, err = set[domain.Course](ctx, a, alice, course.ID, 0, func(p *domain.Course) error {
 		p.Description = file
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	exported, err := a.Export(ctx, alice, project.ID, false)
+	exported, err := a.Export(ctx, alice, course.ID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestTextCannotAuthorizeAnotherUsersFile(t *testing.T) {
 	}
 	for _, entry := range z.File {
 		if entry.Name == file {
-			t.Fatal("arbitrary project description authorized a private blob")
+			t.Fatal("arbitrary course description authorized a private blob")
 		}
 	}
 }
@@ -65,11 +65,11 @@ func fixture(t *testing.T) (*App, string, domain.Record, domain.Record) {
 		t.Fatal(err)
 	}
 	owner := s.LocalUser
-	project, err := a.CreateProject(ctx, owner, domain.Project{Name: "Acceptance fixture"})
+	course, err := a.CreateCourse(ctx, owner, domain.Course{Name: "Acceptance fixture"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	paper, err := a.CreatePaper(ctx, owner, project.ID, domain.Paper{Title: "Synthetic nearest-centroid study"})
+	lesson, err := a.CreateLesson(ctx, owner, course.ID, domain.Lesson{Title: "Synthetic nearest-centroid study"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,11 +79,11 @@ func fixture(t *testing.T) (*App, string, domain.Record, domain.Record) {
 	for i := 0; i < 6; i++ {
 		claims = append(claims, domain.Claim{Section: i, Text: text, Citations: []string{unit.ID}, Verified: true, Kind: "source_excerpt"})
 	}
-	k, err := a.create(ctx, owner, "knowledge", paper.ID, project.ID, paper.ID, domain.Knowledge{Title: "Synthetic nearest-centroid study", Units: []domain.Unit{unit}, Claims: claims, Confirmed: true, Terms: []domain.Term{}, Images: []domain.Image{}, Issues: []domain.Issue{}})
+	k, err := a.create(ctx, owner, "knowledge", lesson.ID, course.ID, lesson.ID, domain.Knowledge{Title: "Synthetic nearest-centroid study", Units: []domain.Unit{unit}, Claims: claims, Confirmed: true, Terms: []domain.Term{}, Images: []domain.Image{}, Issues: []domain.Issue{}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	paper, err = set[domain.Paper](ctx, a, owner, paper.ID, 0, func(p *domain.Paper) error {
+	lesson, err = set[domain.Lesson](ctx, a, owner, lesson.ID, 0, func(p *domain.Lesson) error {
 		p.KnowledgeID = k.ID
 		return nil
 	})
@@ -103,13 +103,13 @@ func fixture(t *testing.T) (*App, string, domain.Record, domain.Record) {
 			t.Fatal(err)
 		}
 	}
-	return a, owner, project, paper
+	return a, owner, course, lesson
 }
 
 func TestSelectedBranchLanguageAndTaskCheckpoint(t *testing.T) {
 	ctx := context.Background()
-	a, owner, project, paper := fixture(t)
-	req, err := a.CreateRequest(ctx, owner, project.ID, domain.Request{PaperIDs: []string{paper.ID}, Selected: []string{"A"}, Languages: map[string]string{"A": "en"}, UILanguage: "zh-TW", Unlimited: true})
+	a, owner, course, lesson := fixture(t)
+	req, err := a.CreateRequest(ctx, owner, course.ID, domain.Request{LessonIDs: []string{lesson.ID}, Selected: []string{"A"}, Languages: map[string]string{"A": "en"}, UILanguage: "zh-TW", Unlimited: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestSelectedBranchLanguageAndTaskCheckpoint(t *testing.T) {
 	if err = a.process(ctx, owner, tasks[0].ID); err != nil {
 		t.Fatal(err)
 	}
-	rows, err := a.Store.List(ctx, owner, store.Filter{Kind: "artifact", Paper: paper.ID})
+	rows, err := a.Store.List(ctx, owner, store.Filter{Kind: "artifact", Lesson: lesson.ID})
 	if err != nil || len(rows) != 1 {
 		t.Fatal("artifact not created")
 	}
@@ -148,8 +148,8 @@ func TestSelectedBranchLanguageAndTaskCheckpoint(t *testing.T) {
 }
 func TestAllProvidersUnavailablePausesWithoutDiscardingSteps(t *testing.T) {
 	ctx := context.Background()
-	a, owner, project, paper := fixture(t)
-	req, err := a.CreateRequest(ctx, owner, project.ID, domain.Request{PaperIDs: []string{paper.ID}, Selected: []string{"A"}, Languages: map[string]string{}, UILanguage: "en", Unlimited: true})
+	a, owner, course, lesson := fixture(t)
+	req, err := a.CreateRequest(ctx, owner, course.ID, domain.Request{LessonIDs: []string{lesson.ID}, Selected: []string{"A"}, Languages: map[string]string{}, UILanguage: "en", Unlimited: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,32 +175,32 @@ func TestAllProvidersUnavailablePausesWithoutDiscardingSteps(t *testing.T) {
 }
 func TestKnowledgeRevisionRejectsStaleSave(t *testing.T) {
 	ctx := context.Background()
-	a, owner, _, paper := fixture(t)
-	p, _ := domain.Decode[domain.Paper](paper.Data)
+	a, owner, _, lesson := fixture(t)
+	p, _ := domain.Decode[domain.Lesson](lesson.Data)
 	old, k, err := get[domain.Knowledge](ctx, a, owner, p.KnowledgeID, "knowledge")
 	if err != nil {
 		t.Fatal(err)
 	}
 	k.Title = "Reviewed title"
-	revision, err := a.SaveKnowledge(ctx, owner, paper.ID, old.Version, k)
+	revision, err := a.SaveKnowledge(ctx, owner, lesson.ID, old.Version, k)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if revision.Version != old.Version+1 {
 		t.Fatal("revision version did not increment")
 	}
-	if _, err = a.SaveKnowledge(ctx, owner, paper.ID, old.Version, k); !errors.Is(err, domain.ErrConflict) {
+	if _, err = a.SaveKnowledge(ctx, owner, lesson.ID, old.Version, k); !errors.Is(err, domain.ErrConflict) {
 		t.Fatalf("stale knowledge accepted: %v", err)
 	}
 }
 func TestExportHasNoCredentialsAndImportRemapsOwnership(t *testing.T) {
 	ctx := context.Background()
-	a, owner, project, _ := fixture(t)
+	a, owner, course, _ := fixture(t)
 	providers, _ := a.Store.List(ctx, owner, store.Filter{Kind: "provider"})
 	if err := a.Providers.SetSecret(owner, providers[0].ID, "DO-NOT-EXPORT-THIS-KEY"); err != nil {
 		t.Fatal(err)
 	}
-	b, err := a.Export(ctx, owner, project.ID, false)
+	b, err := a.Export(ctx, owner, course.ID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,22 +224,22 @@ func TestExportHasNoCredentialsAndImportRemapsOwnership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if imported.ID == project.ID || imported.Owner != bob {
+	if imported.ID == course.ID || imported.Owner != bob {
 		t.Fatal("ownership or identifiers not remapped")
 	}
-	if _, err = a.Store.Get(ctx, owner, imported.ID, "project"); !errors.Is(err, domain.ErrNotFound) {
-		t.Fatal("imported project visible to original owner")
+	if _, err = a.Store.Get(ctx, owner, imported.ID, "course"); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatal("imported course visible to original owner")
 	}
-	var p domain.Project
+	var p domain.Course
 	if json.Unmarshal(imported.Data, &p) != nil || p.Name != "Acceptance fixture" {
-		t.Fatal("project data lost")
+		t.Fatal("course data lost")
 	}
 }
 
 func TestKnowledgeIssuesCanOnlyBeResolvedNotRewritten(t *testing.T) {
 	ctx := context.Background()
-	a, owner, _, paper := fixture(t)
-	p, _ := domain.Decode[domain.Paper](paper.Data)
+	a, owner, _, lesson := fixture(t)
+	p, _ := domain.Decode[domain.Lesson](lesson.Data)
 	parsed := []domain.Issue{{Code: "formula_review", Citation: "u:p1"}, {Code: "formula_review", Citation: "u:p2"}}
 	if _, err := set[domain.Knowledge](ctx, a, owner, p.KnowledgeID, 0, func(k *domain.Knowledge) error { k.Issues = parsed; return nil }); err != nil {
 		t.Fatal(err)
@@ -253,7 +253,7 @@ func TestKnowledgeIssuesCanOnlyBeResolvedNotRewritten(t *testing.T) {
 		{Code: "something_else", Citation: "u:p2", Resolved: true}, // does not match the stored item
 		{Code: "injected", Resolved: false},
 	}
-	revision, err := a.SaveKnowledge(ctx, owner, paper.ID, old.Version, k)
+	revision, err := a.SaveKnowledge(ctx, owner, lesson.ID, old.Version, k)
 	if err != nil {
 		t.Fatal(err)
 	}

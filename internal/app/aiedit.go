@@ -63,6 +63,6 @@ func (a *App) SuggestEdits(ctx context.Context, owner, artifactID, instruction s
 			out = append(out, research.CheckEdit(b, text, instruction, cited[b.ID]))
 		}
 	}
-	a.Store.Event(ctx, owner, r.Project, r.Paper, "ai_edit_suggested", map[string]any{"artifact": artifactID, "blocks": len(blocks), "edits": len(out), "provider": provider})
+	a.Store.Event(ctx, owner, r.Course, r.Lesson, "ai_edit_suggested", map[string]any{"artifact": artifactID, "blocks": len(blocks), "edits": len(out), "provider": provider})
 	return out, nil
 }

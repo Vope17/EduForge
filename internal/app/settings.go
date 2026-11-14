@@ -136,5 +136,5 @@ func (a *App) ReapplyTemplate(ctx context.Context, owner, id, templateID string)
 		return old, err
 	}
 	art.Check = research.Validate(art, k)
-	return a.Store.Create(ctx, domain.Record{Owner: owner, Kind: "artifact", Parent: old.Parent, Project: old.Project, Paper: old.Paper, Version: old.Version + 1, Data: domain.Encode(art)})
+	return a.Store.Create(ctx, domain.Record{Owner: owner, Kind: "artifact", Parent: old.Parent, Course: old.Course, Lesson: old.Lesson, Version: old.Version + 1, Data: domain.Encode(art)})
 }

@@ -30,10 +30,10 @@ type Store struct {
 	LocalUser string
 }
 type Filter struct {
-	Kind    string
-	Project string
-	Paper   string
-	Parent  string
+	Kind   string
+	Course string
+	Lesson string
+	Parent string
 }
 
 func Open(root string) (*Store, error) {
@@ -76,12 +76,12 @@ func Open(root string) (*Store, error) {
 func (s *Store) Close() error { return s.DB.Close() }
 func scan(row interface{ Scan(...any) error }) (domain.Record, error) {
 	var r domain.Record
-	var parent, project, paper sql.NullString
+	var parent, course, lesson sql.NullString
 	var data string
-	err := row.Scan(&r.ID, &r.Owner, &r.Kind, &parent, &project, &paper, &r.Version, &data, &r.Created, &r.Updated)
+	err := row.Scan(&r.ID, &r.Owner, &r.Kind, &parent, &course, &lesson, &r.Version, &data, &r.Created, &r.Updated)
 	r.Parent = parent.String
-	r.Project = project.String
-	r.Paper = paper.String
+	r.Course = course.String
+	r.Lesson = lesson.String
 	r.Data = json.RawMessage(data)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = domain.ErrNotFound
@@ -104,7 +104,7 @@ func (s *Store) Get(ctx context.Context, owner, id, kind string) (domain.Record,
 func (s *Store) List(ctx context.Context, owner string, f Filter) ([]domain.Record, error) {
 	q := "SELECT * FROM records WHERE owner_user_id=?"
 	args := []any{owner}
-	for _, pair := range [][2]string{{"kind", f.Kind}, {"project_id", f.Project}, {"paper_id", f.Paper}, {"parent_id", f.Parent}} {
+	for _, pair := range [][2]string{{"kind", f.Kind}, {"course_id", f.Course}, {"lesson_id", f.Lesson}, {"parent_id", f.Parent}} {
 		if pair[1] != "" {
 			q += " AND " + pair[0] + "=?"
 			args = append(args, pair[1])
@@ -141,23 +141,23 @@ func (s *Store) Create(ctx context.Context, r domain.Record) (domain.Record, err
 	}
 	r.Created = domain.Now()
 	r.Updated = r.Created
-	for _, pair := range [][2]string{{r.Project, "project"}, {r.Paper, "paper"}} {
+	for _, pair := range [][2]string{{r.Course, "course"}, {r.Lesson, "lesson"}} {
 		if pair[0] != "" {
 			if _, err := s.Get(ctx, r.Owner, pair[0], pair[1]); err != nil {
 				return r, err
 			}
 		}
 	}
-	if r.Paper != "" {
-		paper, err := s.Get(ctx, r.Owner, r.Paper, "paper")
+	if r.Lesson != "" {
+		lesson, err := s.Get(ctx, r.Owner, r.Lesson, "lesson")
 		if err != nil {
 			return r, err
 		}
-		if paper.Project != r.Project {
-			return r, errors.New("paper_project_mismatch")
+		if lesson.Course != r.Course {
+			return r, errors.New("lesson_course_mismatch")
 		}
 	}
-	_, err := s.DB.ExecContext(ctx, "INSERT INTO records VALUES(?,?,?,?,?,?,?,?,?,?)", r.ID, r.Owner, r.Kind, nullable(r.Parent), nullable(r.Project), nullable(r.Paper), r.Version, string(r.Data), r.Created, r.Updated)
+	_, err := s.DB.ExecContext(ctx, "INSERT INTO records VALUES(?,?,?,?,?,?,?,?,?,?)", r.ID, r.Owner, r.Kind, nullable(r.Parent), nullable(r.Course), nullable(r.Lesson), r.Version, string(r.Data), r.Created, r.Updated)
 	return r, err
 }
 
@@ -258,8 +258,8 @@ func (s *Store) Path(rel string) (string, error) {
 	}
 	return path, nil
 }
-func (s *Store) Event(ctx context.Context, owner, project, paper, action string, detail any) {
-	_, _ = s.Create(ctx, domain.Record{Owner: owner, Kind: "event", Project: project, Paper: paper, Parent: project, Data: domain.Encode(map[string]any{"action": action, "detail": detail})})
+func (s *Store) Event(ctx context.Context, owner, course, lesson, action string, detail any) {
+	_, _ = s.Create(ctx, domain.Record{Owner: owner, Kind: "event", Course: course, Lesson: lesson, Parent: course, Data: domain.Encode(map[string]any{"action": action, "detail": detail})})
 }
 func (s *Store) Users(ctx context.Context) ([]string, error) {
 	rows, err := s.DB.QueryContext(ctx, "SELECT id FROM users")

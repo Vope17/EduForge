@@ -66,7 +66,7 @@ func line(words ...string) string {
 }
 
 func TestSideBySideCaptionsReadPerColumn(t *testing.T) {
-	// Figure 6 and 7 captions of the AIDA paper, as pdftotext -bbox-layout groups them.
+	// Figure 6 and 7 captions of the AIDA lesson, as pdftotext -bbox-layout groups them.
 	b := layoutXML(
 		line(word(317.955, 344.4, "Figure"), word(347.7, 354.8, "6:"), word(358.1, 389.2, "Quality"), word(392.5, 434.5, "advantage"),
 			word(440.643, 466.1, "Figure"), word(467.6, 474.4, "7:"), word(475.9, 521.1, "Superiority"), word(522.6, 530.9, "of"), word(532.4, 557.6, "multi-")),

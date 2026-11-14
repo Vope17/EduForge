@@ -43,13 +43,13 @@ func TestFiguresAppearOnceNextToCitingSections(t *testing.T) {
 	}
 }
 
-func TestPaperNamesPreferDocumentTitle(t *testing.T) {
+func TestLessonNamesPreferDocumentTitle(t *testing.T) {
 	k := domain.Knowledge{Title: "test_title", Units: []domain.Unit{
 		{ID: "a:p1", SourceName: "AIDA DeviceFailures.pdf", SourceTitle: "AIDA: Device Failures"},
 		{ID: "a:p2", SourceName: "AIDA DeviceFailures.pdf", SourceTitle: "AIDA: Device Failures"},
-		{ID: "b:p1", SourceName: "second paper.pdf"},
+		{ID: "b:p1", SourceName: "second lesson.pdf"},
 	}}
-	if got := DocumentTitle(k); got != "AIDA: Device Failures / second paper" {
+	if got := DocumentTitle(k); got != "AIDA: Device Failures / second lesson" {
 		t.Fatalf("DocumentTitle = %q", got)
 	}
 	if got := DocumentTitle(domain.Knowledge{Title: "test_title"}); got != "test_title" {

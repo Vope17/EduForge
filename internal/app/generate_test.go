@@ -19,8 +19,8 @@ import (
 // several slides. Related research is never a comparison with the library.
 func TestOutputsAreWrittenFromThePagesAndTheUsersWishes(t *testing.T) {
 	ctx := context.Background()
-	a, owner, project, paper := fixture(t)
-	p, _ := domain.Decode[domain.Paper](paper.Data)
+	a, owner, course, lesson := fixture(t)
+	p, _ := domain.Decode[domain.Lesson](lesson.Data)
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, image.NewGray(image.Rect(0, 0, 4, 4))); err != nil {
 		t.Fatal(err)
@@ -54,7 +54,7 @@ func TestOutputsAreWrittenFromThePagesAndTheUsersWishes(t *testing.T) {
 		images = append(images, providers.ImagesFrom(ctx))
 		switch {
 		case strings.Contains(prompt, "Plan the content slides"):
-			// The plan: six slides in the paper's order.
+			// The plan: six slides in the lesson's order.
 			items := []string{}
 			for _, title := range []string{"Intro", "Design", "Merging", "Logs", "Eval", "Limits"} {
 				items = append(items, `{"title":"`+title+`","part":"§ `+title+`","pages":["`+cite+`","unknown:p9"],"figures":[],"equation":`+map[bool]string{true: "true", false: "false"}[title == "Merging"]+`,"content":"what `+title+` says"}`)
@@ -80,7 +80,7 @@ func TestOutputsAreWrittenFromThePagesAndTheUsersWishes(t *testing.T) {
 	run := func(kind, depth string) domain.Artifact {
 		t.Helper()
 		settings := domain.OutputSettings{Depth: depth, Level: "beginner", Minutes: 10, Instructions: map[string]string{"A": "Explain every equation twice.", "B": "Put the equations on the slides."}}
-		req, err := a.CreateRequest(ctx, owner, project.ID, domain.Request{PaperIDs: []string{paper.ID}, Selected: []string{kind}, Languages: map[string]string{kind: "zh-TW"}, UILanguage: "zh-TW", Unlimited: true, Settings: settings})
+		req, err := a.CreateRequest(ctx, owner, course.ID, domain.Request{LessonIDs: []string{lesson.ID}, Selected: []string{kind}, Languages: map[string]string{kind: "zh-TW"}, UILanguage: "zh-TW", Unlimited: true, Settings: settings})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -92,7 +92,7 @@ func TestOutputsAreWrittenFromThePagesAndTheUsersWishes(t *testing.T) {
 		if err = a.process(ctx, owner, tasks[0].ID); err != nil {
 			t.Fatal(err)
 		}
-		rows, _ := a.Store.List(ctx, owner, store.Filter{Kind: "artifact", Paper: paper.ID})
+		rows, _ := a.Store.List(ctx, owner, store.Filter{Kind: "artifact", Lesson: lesson.ID})
 		for _, r := range rows {
 			if art, _ := domain.Decode[domain.Artifact](r.Data); art.TaskID == tasks[0].ID {
 				return art
@@ -104,7 +104,7 @@ func TestOutputsAreWrittenFromThePagesAndTheUsersWishes(t *testing.T) {
 
 	reader := run("A", "deep")
 	if len(prompts) != 6 {
-		t.Fatalf("six sections; related work is skipped when the paper has none: %d", len(prompts))
+		t.Fatalf("six sections; related work is skipped when the lesson has none: %d", len(prompts))
 	}
 	for i, prompt := range prompts {
 		if !strings.Contains(prompt, "Explain every equation twice.") || strings.Contains(prompt, "Put the equations on the slides.") {
@@ -118,7 +118,7 @@ func TestOutputsAreWrittenFromThePagesAndTheUsersWishes(t *testing.T) {
 		}
 	}
 	if !strings.Contains(prompts[2], "Do not skip components") {
-		t.Fatal("the method follows the paper's order (core concepts come second, method third)")
+		t.Fatal("the method follows the lesson's order (core concepts come second, method third)")
 	}
 	for _, sec := range reader.Sections {
 		if strings.Contains(sec.Title, "相關研究比較") || strings.Contains(sec.Title, "Related research comparison") {
@@ -131,7 +131,7 @@ func TestOutputsAreWrittenFromThePagesAndTheUsersWishes(t *testing.T) {
 		t.Fatalf("a deck is planned once, then written four slides at a time: %d calls", len(prompts))
 	}
 	plan := prompts[0]
-	for _, want := range []string{"Follow the paper's own structure and order", "Plan exactly 14 content slides", "Put the equations on the slides.", "Figure 1 (page 1): Figure 1: one.", "[" + cite + "]"} {
+	for _, want := range []string{"Follow the lesson's own structure and order", "Plan exactly 14 content slides", "Put the equations on the slides.", "Figure 1 (page 1): Figure 1: one.", "[" + cite + "]"} {
 		if !strings.Contains(plan, want) {
 			t.Fatalf("the plan prompt lacks %q:\n%s", want, plan)
 		}

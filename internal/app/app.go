@@ -35,7 +35,7 @@ func New(s *store.Store, secrets string) (*App, error) {
 		return nil, err
 	}
 	if storePathOverlap(s.Root, abs) {
-		return nil, errors.New("secrets_must_be_outside_project_data")
+		return nil, errors.New("secrets_must_be_outside_course_data")
 	}
 	if err = os.MkdirAll(abs, 0700); err != nil {
 		return nil, err
@@ -48,8 +48,8 @@ func storePathOverlap(a, b string) bool {
 	rel, err := filepath.Rel(a, b)
 	return err == nil && (rel == "." || (!strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ".."))
 }
-func (a *App) create(ctx context.Context, owner, kind, parent, project, paper string, data any) (domain.Record, error) {
-	return a.Store.Create(ctx, domain.Record{Owner: owner, Kind: kind, Parent: parent, Project: project, Paper: paper, Data: domain.Encode(data)})
+func (a *App) create(ctx context.Context, owner, kind, parent, course, lesson string, data any) (domain.Record, error) {
+	return a.Store.Create(ctx, domain.Record{Owner: owner, Kind: kind, Parent: parent, Course: course, Lesson: lesson, Data: domain.Encode(data)})
 }
 func set[T any](ctx context.Context, a *App, owner, id string, version int, fn func(*T) error) (domain.Record, error) {
 	return a.Store.Update(ctx, owner, id, version, func(r *domain.Record) error {
@@ -88,10 +88,10 @@ func (a *App) Bootstrap(ctx context.Context, owner string) error {
 	}
 	return nil
 }
-func (a *App) CreateProject(ctx context.Context, owner string, p domain.Project) (domain.Record, error) {
+func (a *App) CreateCourse(ctx context.Context, owner string, p domain.Course) (domain.Record, error) {
 	p.Name = strings.TrimSpace(p.Name)
 	if p.Name == "" || len([]rune(p.Name)) > 150 {
-		return domain.Record{}, errors.New("project_name_required")
+		return domain.Record{}, errors.New("course_name_required")
 	}
 	if p.Style == nil {
 		p.Style = map[string]domain.Style{}
@@ -101,7 +101,7 @@ func (a *App) CreateProject(ctx context.Context, owner string, p domain.Project)
 			return domain.Record{}, err
 		}
 	}
-	return a.create(ctx, owner, "project", "", "", "", p)
+	return a.create(ctx, owner, "course", "", "", "", p)
 }
 func NormalizeSettings(s domain.OutputSettings) domain.OutputSettings {
 	if s.Depth == "" {
@@ -158,29 +158,29 @@ func validateOutputSettings(s domain.OutputSettings) error {
 	}
 	return nil
 }
-func (a *App) CreatePaper(ctx context.Context, owner, project string, p domain.Paper) (domain.Record, error) {
-	if _, err := a.Store.Get(ctx, owner, project, "project"); err != nil {
+func (a *App) CreateLesson(ctx context.Context, owner, course string, p domain.Lesson) (domain.Record, error) {
+	if _, err := a.Store.Get(ctx, owner, course, "course"); err != nil {
 		return domain.Record{}, err
 	}
 	p.Title = strings.TrimSpace(p.Title)
 	if p.Title == "" {
-		return domain.Record{}, errors.New("paper_title_required")
+		return domain.Record{}, errors.New("lesson_title_required")
 	}
 	p.KnowledgeID = ""
 	p.Settings = NormalizeSettings(p.Settings)
 	if err := validateOutputSettings(p.Settings); err != nil {
 		return domain.Record{}, err
 	}
-	return a.create(ctx, owner, "paper", project, project, "", p)
+	return a.create(ctx, owner, "lesson", course, course, "", p)
 }
-func (a *App) SavePaper(ctx context.Context, owner, id string, version int, p domain.Paper) (domain.Record, error) {
+func (a *App) SaveLesson(ctx context.Context, owner, id string, version int, p domain.Lesson) (domain.Record, error) {
 	p.Settings = NormalizeSettings(p.Settings)
 	if err := validateOutputSettings(p.Settings); err != nil {
 		return domain.Record{}, err
 	}
-	return set[domain.Paper](ctx, a, owner, id, version, func(old *domain.Paper) error {
+	return set[domain.Lesson](ctx, a, owner, id, version, func(old *domain.Lesson) error {
 		if strings.TrimSpace(p.Title) == "" {
-			return errors.New("paper_title_required")
+			return errors.New("lesson_title_required")
 		}
 		old.Title = p.Title
 		old.Group = p.Group
@@ -189,8 +189,8 @@ func (a *App) SavePaper(ctx context.Context, owner, id string, version int, p do
 		return nil
 	})
 }
-func (a *App) Upload(ctx context.Context, owner, paperID, name, role string, b []byte) (domain.Record, error) {
-	paper, _, err := get[domain.Paper](ctx, a, owner, paperID, "paper")
+func (a *App) Upload(ctx context.Context, owner, lessonID, name, role string, b []byte) (domain.Record, error) {
+	lesson, _, err := get[domain.Lesson](ctx, a, owner, lessonID, "lesson")
 	if err != nil {
 		return domain.Record{}, err
 	}
@@ -217,18 +217,18 @@ func (a *App) Upload(ctx context.Context, owner, paperID, name, role string, b [
 	if err != nil {
 		return domain.Record{}, err
 	}
-	r, err := a.create(ctx, owner, "source", paperID, paper.Project, paperID, domain.Source{Name: filepath.Base(name), Role: role, Path: rel, SHA256: sum, Size: int64(len(b))})
+	r, err := a.create(ctx, owner, "source", lessonID, lesson.Course, lessonID, domain.Source{Name: filepath.Base(name), Role: role, Path: rel, SHA256: sum, Size: int64(len(b))})
 	if err == nil {
-		a.Store.Event(ctx, owner, paper.Project, paperID, "source_uploaded", map[string]any{"id": r.ID, "role": role, "sha256": sum})
+		a.Store.Event(ctx, owner, lesson.Course, lessonID, "source_uploaded", map[string]any{"id": r.ID, "role": role, "sha256": sum})
 	}
 	return r, err
 }
-func (a *App) QueueParse(ctx context.Context, owner, paperID string) (domain.Record, error) {
-	r, _, err := get[domain.Paper](ctx, a, owner, paperID, "paper")
+func (a *App) QueueParse(ctx context.Context, owner, lessonID string) (domain.Record, error) {
+	r, _, err := get[domain.Lesson](ctx, a, owner, lessonID, "lesson")
 	if err != nil {
 		return domain.Record{}, err
 	}
-	sources, err := a.Store.List(ctx, owner, store.Filter{Kind: "source", Paper: paperID})
+	sources, err := a.Store.List(ctx, owner, store.Filter{Kind: "source", Lesson: lessonID})
 	if err != nil {
 		return domain.Record{}, err
 	}
@@ -242,10 +242,10 @@ func (a *App) QueueParse(ctx context.Context, owner, paperID string) (domain.Rec
 	if count == 0 {
 		return domain.Record{}, errors.New("research_source_required")
 	}
-	return a.create(ctx, owner, "task", paperID, r.Project, paperID, domain.Task{Type: "parse", Status: "queued", Stage: "parse", Total: count})
+	return a.create(ctx, owner, "task", lessonID, r.Course, lessonID, domain.Task{Type: "parse", Status: "queued", Stage: "parse", Total: count})
 }
-func (a *App) SaveKnowledge(ctx context.Context, owner, paperID string, expected int, k domain.Knowledge) (domain.Record, error) {
-	paper, p, err := get[domain.Paper](ctx, a, owner, paperID, "paper")
+func (a *App) SaveKnowledge(ctx context.Context, owner, lessonID string, expected int, k domain.Knowledge) (domain.Record, error) {
+	lesson, p, err := get[domain.Lesson](ctx, a, owner, lessonID, "lesson")
 	if err != nil {
 		return domain.Record{}, err
 	}
@@ -290,16 +290,16 @@ func (a *App) SaveKnowledge(ctx context.Context, owner, paperID string, expected
 	k.Issues = issues
 	k.Edits = oldK.Edits + 1
 	k.Author, k.Language, k.AIError = oldK.Author, oldK.Language, oldK.AIError
-	r, err := a.Store.Create(ctx, domain.Record{Owner: owner, Kind: "knowledge", Parent: paperID, Project: paper.Project, Paper: paperID, Version: old.Version + 1, Data: domain.Encode(k)})
+	r, err := a.Store.Create(ctx, domain.Record{Owner: owner, Kind: "knowledge", Parent: lessonID, Course: lesson.Course, Lesson: lessonID, Version: old.Version + 1, Data: domain.Encode(k)})
 	if err != nil {
 		return r, err
 	}
-	_, err = set[domain.Paper](ctx, a, owner, paperID, paper.Version, func(p *domain.Paper) error {
+	_, err = set[domain.Lesson](ctx, a, owner, lessonID, lesson.Version, func(p *domain.Lesson) error {
 		p.KnowledgeID = r.ID
 		return nil
 	})
 	if err == nil {
-		a.Store.Event(ctx, owner, paper.Project, paperID, "knowledge_revision", map[string]any{"previous": old.ID, "current": r.ID, "edits": k.Edits})
+		a.Store.Event(ctx, owner, lesson.Course, lessonID, "knowledge_revision", map[string]any{"previous": old.ID, "current": r.ID, "edits": k.Edits})
 	}
 	return r, err
 }
@@ -382,11 +382,11 @@ func (a *App) SaveProvider(ctx context.Context, owner, id string, p domain.Provi
 	}
 	return r, err
 }
-func (a *App) DeleteProject(ctx context.Context, owner, id string) error {
-	if _, err := a.Store.Get(ctx, owner, id, "project"); err != nil {
+func (a *App) DeleteCourse(ctx context.Context, owner, id string) error {
+	if _, err := a.Store.Get(ctx, owner, id, "course"); err != nil {
 		return err
 	}
-	tasks, err := a.Store.List(ctx, owner, store.Filter{Kind: "task", Project: id})
+	tasks, err := a.Store.List(ctx, owner, store.Filter{Kind: "task", Course: id})
 	if err != nil {
 		return err
 	}
@@ -398,17 +398,17 @@ func (a *App) DeleteProject(ctx context.Context, owner, id string) error {
 	}
 	return a.Store.Delete(ctx, owner, id)
 }
-func (a *App) Summary(ctx context.Context, owner, project string) (map[string]any, error) {
+func (a *App) Summary(ctx context.Context, owner, course string) (map[string]any, error) {
 	out := map[string]any{}
-	if project != "" {
-		p, err := a.Store.Get(ctx, owner, project, "project")
+	if course != "" {
+		p, err := a.Store.Get(ctx, owner, course, "course")
 		if err != nil {
 			return nil, err
 		}
-		out["project"] = p
+		out["course"] = p
 	}
-	for _, kind := range []string{"paper", "source", "knowledge", "request", "preview", "task", "step", "artifact", "folder", "event"} {
-		r, err := a.Store.List(ctx, owner, store.Filter{Kind: kind, Project: project})
+	for _, kind := range []string{"lesson", "source", "knowledge", "request", "preview", "task", "step", "artifact", "chapter", "event"} {
+		r, err := a.Store.List(ctx, owner, store.Filter{Kind: kind, Course: course})
 		if err != nil {
 			return nil, err
 		}

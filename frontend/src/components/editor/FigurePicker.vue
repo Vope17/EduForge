@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useWorkspace } from '../../lib/workspace.ts'
 import type { Image } from '../../api/types.ts'
-// Chooses one of the paper's original figures.
+// Chooses one of the lesson's original figures.
 defineProps<{ images: Image[]; url: (path: string) => string }>()
 const emit = defineEmits<{ pick: [path: string]; close: [] }>()
 const { t } = useWorkspace()

@@ -94,7 +94,7 @@ function pick(path: string) {
 
     <article class="doc-page" :style="pageStyle">
       <header v-if="title" class="doc-title">
-        <p class="doc-kicker">{{ kind === 'C' ? (language === 'zh-TW' ? '實驗復現規劃書' : 'Experiment reproduction plan') : (language === 'zh-TW' ? '論文導讀' : 'Paper reading guide') }}</p>
+        <p class="doc-kicker">{{ kind === 'C' ? (language === 'zh-TW' ? '實驗復現規劃書' : 'Experiment reproduction plan') : (language === 'zh-TW' ? '論文導讀' : 'Lesson reading guide') }}</p>
         <h1>{{ title }}</h1>
       </header>
       <section v-for="(sec, i) in sections" :key="i" class="doc-section" :class="{ 'ai-selected': selectable && isSelected(i) }">

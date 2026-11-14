@@ -71,6 +71,6 @@ func TestReaderEscapesSourceContentAndKeepsOriginalNumbers(t *testing.T) {
 		t.Fatal("reader escaped or modified source incorrectly")
 	}
 	if bytes.Contains(b, []byte("s:p1")) || !bytes.Contains(b, []byte("<li>Research</li>")) {
-		t.Fatal("references should list the paper name, not internal source IDs")
+		t.Fatal("references should list the lesson name, not internal source IDs")
 	}
 }

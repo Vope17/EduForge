@@ -18,50 +18,50 @@ func count(t *testing.T, a *App, owner string, f store.Filter) int {
 	return len(items)
 }
 
-func TestDeletePaperRemovesItsRecords(t *testing.T) {
+func TestDeleteLessonRemovesItsRecords(t *testing.T) {
 	ctx := context.Background()
-	a, owner, project, paper := fixture(t)
-	other, err := a.CreatePaper(ctx, owner, project.ID, domain.Paper{Title: "Kept study"})
+	a, owner, course, lesson := fixture(t)
+	other, err := a.CreateLesson(ctx, owner, course.ID, domain.Lesson{Title: "Kept study"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = a.Upload(ctx, owner, paper.ID, "paper.pdf", "research", []byte("%PDF-1.4 test")); err != nil {
+	if _, err = a.Upload(ctx, owner, lesson.ID, "lesson.pdf", "research", []byte("%PDF-1.4 test")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = a.create(ctx, owner, "artifact", paper.ID, project.ID, paper.ID, domain.Artifact{Type: "A", Language: "en"}); err != nil {
+	if _, err = a.create(ctx, owner, "artifact", lesson.ID, course.ID, lesson.ID, domain.Artifact{Type: "A", Language: "en"}); err != nil {
 		t.Fatal(err)
 	}
-	task, err := a.create(ctx, owner, "task", paper.ID, project.ID, paper.ID, domain.Task{Type: "A", Status: "running"})
+	task, err := a.create(ctx, owner, "task", lesson.ID, course.ID, lesson.ID, domain.Task{Type: "A", Status: "running"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = a.DeletePaper(ctx, owner, paper.ID); err == nil || err.Error() != "cancel_active_tasks_before_delete" {
+	if err = a.DeleteLesson(ctx, owner, lesson.ID); err == nil || err.Error() != "cancel_active_tasks_before_delete" {
 		t.Fatalf("a running task should block deletion, got %v", err)
 	}
 	if _, err = set[domain.Task](ctx, a, owner, task.ID, 0, func(t *domain.Task) error { t.Status = "completed"; return nil }); err != nil {
 		t.Fatal(err)
 	}
-	if err = a.DeletePaper(ctx, owner, paper.ID); err != nil {
+	if err = a.DeleteLesson(ctx, owner, lesson.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = a.Store.Get(ctx, owner, paper.ID, "paper"); !errors.Is(err, domain.ErrNotFound) {
-		t.Fatal("paper should be gone")
+	if _, err = a.Store.Get(ctx, owner, lesson.ID, "lesson"); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatal("lesson should be gone")
 	}
 	for _, kind := range []string{"source", "knowledge", "artifact", "task"} {
-		if n := count(t, a, owner, store.Filter{Kind: kind, Paper: paper.ID}); n != 0 {
+		if n := count(t, a, owner, store.Filter{Kind: kind, Lesson: lesson.ID}); n != 0 {
 			t.Fatalf("%d %s records survived", n, kind)
 		}
 	}
-	if _, err = a.Store.Get(ctx, owner, other.ID, "paper"); err != nil {
+	if _, err = a.Store.Get(ctx, owner, other.ID, "lesson"); err != nil {
 		t.Fatal("another study was affected")
 	}
 }
 
 func TestDeleteArtifactVersionOrAllVersions(t *testing.T) {
 	ctx := context.Background()
-	a, owner, project, paper := fixture(t)
+	a, owner, course, lesson := fixture(t)
 	add := func(lang string) domain.Record {
-		r, err := a.create(ctx, owner, "artifact", paper.ID, project.ID, paper.ID, domain.Artifact{Type: "A", Language: lang})
+		r, err := a.create(ctx, owner, "artifact", lesson.ID, course.ID, lesson.ID, domain.Artifact{Type: "A", Language: lang})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -77,7 +77,7 @@ func TestDeleteArtifactVersionOrAllVersions(t *testing.T) {
 	if n, err := a.DeleteArtifact(ctx, owner, v3.ID, true); err != nil || n != 2 {
 		t.Fatalf("all versions delete removed %d: %v", n, err)
 	}
-	if n := count(t, a, owner, store.Filter{Kind: "artifact", Paper: paper.ID}); n != 1 {
+	if n := count(t, a, owner, store.Filter{Kind: "artifact", Lesson: lesson.ID}); n != 1 {
 		t.Fatalf("only the English output should remain, %d left", n)
 	}
 	if _, err := a.Store.Get(ctx, owner, english.ID, "artifact"); err != nil {
@@ -85,49 +85,49 @@ func TestDeleteArtifactVersionOrAllVersions(t *testing.T) {
 	}
 }
 
-func TestFoldersFileStudiesAndSurviveExport(t *testing.T) {
+func TestChaptersFileStudiesAndSurviveExport(t *testing.T) {
 	ctx := context.Background()
-	a, owner, project, paper := fixture(t)
-	folder, err := a.CreateFolder(ctx, owner, project.ID, "  Vision  ")
+	a, owner, course, lesson := fixture(t)
+	chapter, err := a.CreateChapter(ctx, owner, course.ID, "  Vision  ")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f, _ := domain.Decode[domain.Folder](folder.Data); f.Name != "Vision" {
-		t.Fatalf("folder name not trimmed: %q", f.Name)
+	if f, _ := domain.Decode[domain.Chapter](chapter.Data); f.Name != "Vision" {
+		t.Fatalf("chapter name not trimmed: %q", f.Name)
 	}
-	if _, err = a.CreateFolder(ctx, owner, project.ID, " "); err == nil {
-		t.Fatal("empty folder name accepted")
+	if _, err = a.CreateChapter(ctx, owner, course.ID, " "); err == nil {
+		t.Fatal("empty chapter name accepted")
 	}
-	if _, err = a.MovePaper(ctx, owner, paper.ID, folder.ID); err != nil {
+	if _, err = a.MoveLesson(ctx, owner, lesson.ID, chapter.ID); err != nil {
 		t.Fatal(err)
 	}
-	elsewhere, err := a.CreateProject(ctx, owner, domain.Project{Name: "Elsewhere"})
+	elsewhere, err := a.CreateCourse(ctx, owner, domain.Course{Name: "Elsewhere"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	foreign, err := a.CreateFolder(ctx, owner, elsewhere.ID, "Foreign")
+	foreign, err := a.CreateChapter(ctx, owner, elsewhere.ID, "Foreign")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = a.MovePaper(ctx, owner, paper.ID, foreign.ID); err == nil {
-		t.Fatal("a study moved into another project's folder")
+	if _, err = a.MoveLesson(ctx, owner, lesson.ID, foreign.ID); err == nil {
+		t.Fatal("a study moved into another course's chapter")
 	}
-	// Saving the study's other fields keeps its folder.
-	current, _ := a.Store.Get(ctx, owner, paper.ID, "paper")
-	p, _ := domain.Decode[domain.Paper](current.Data)
+	// Saving the study's other fields keeps its chapter.
+	current, _ := a.Store.Get(ctx, owner, lesson.ID, "lesson")
+	p, _ := domain.Decode[domain.Lesson](current.Data)
 	p.Repo = "https://example.org/repo"
-	p.Folder = ""
-	if current, err = a.SavePaper(ctx, owner, paper.ID, current.Version, p); err != nil {
+	p.Chapter = ""
+	if current, err = a.SaveLesson(ctx, owner, lesson.ID, current.Version, p); err != nil {
 		t.Fatal(err)
 	}
-	if p, _ = domain.Decode[domain.Paper](current.Data); p.Folder != folder.ID {
-		t.Fatal("saving study fields dropped its folder")
+	if p, _ = domain.Decode[domain.Lesson](current.Data); p.Chapter != chapter.ID {
+		t.Fatal("saving study fields dropped its chapter")
 	}
-	if _, err = a.RenameFolder(ctx, owner, folder.ID, "Vision models"); err != nil {
+	if _, err = a.RenameChapter(ctx, owner, chapter.ID, "Vision models"); err != nil {
 		t.Fatal(err)
 	}
 
-	archive, err := a.Export(ctx, owner, project.ID, false)
+	archive, err := a.Export(ctx, owner, course.ID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,34 +135,34 @@ func TestFoldersFileStudiesAndSurviveExport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	folders, _ := a.Store.List(ctx, owner, store.Filter{Kind: "folder", Project: imported.ID})
-	papers, _ := a.Store.List(ctx, owner, store.Filter{Kind: "paper", Project: imported.ID})
-	if len(folders) != 1 || len(papers) != 1 {
-		t.Fatalf("import should bring 1 folder and 1 study, got %d and %d", len(folders), len(papers))
+	chapters, _ := a.Store.List(ctx, owner, store.Filter{Kind: "chapter", Course: imported.ID})
+	lessons, _ := a.Store.List(ctx, owner, store.Filter{Kind: "lesson", Course: imported.ID})
+	if len(chapters) != 1 || len(lessons) != 1 {
+		t.Fatalf("import should bring 1 chapter and 1 study, got %d and %d", len(chapters), len(lessons))
 	}
-	if ip, _ := domain.Decode[domain.Paper](papers[0].Data); ip.Folder != folders[0].ID {
-		t.Fatal("imported study should point at the imported folder")
+	if ip, _ := domain.Decode[domain.Lesson](lessons[0].Data); ip.Chapter != chapters[0].ID {
+		t.Fatal("imported study should point at the imported chapter")
 	}
 
-	if err = a.DeleteFolder(ctx, owner, folder.ID); err != nil {
+	if err = a.DeleteChapter(ctx, owner, chapter.ID); err != nil {
 		t.Fatal(err)
 	}
-	current, _ = a.Store.Get(ctx, owner, paper.ID, "paper")
-	if p, _ = domain.Decode[domain.Paper](current.Data); p.Folder != "" {
-		t.Fatal("deleting a folder should unfile its studies")
+	current, _ = a.Store.Get(ctx, owner, lesson.ID, "lesson")
+	if p, _ = domain.Decode[domain.Lesson](current.Data); p.Chapter != "" {
+		t.Fatal("deleting a chapter should unfile its studies")
 	}
 }
 
 func TestDesignReferencesAreRejected(t *testing.T) {
 	ctx := context.Background()
-	a, owner, _, paper := fixture(t)
-	if _, err := a.Upload(ctx, owner, paper.ID, "look.png", "design", []byte("png")); err == nil {
+	a, owner, _, lesson := fixture(t)
+	if _, err := a.Upload(ctx, owner, lesson.ID, "look.png", "design", []byte("png")); err == nil {
 		t.Fatal("design reference upload accepted")
 	}
-	if _, err := a.Upload(ctx, owner, paper.ID, "deck.potx", "research", []byte("PK..")); err == nil {
+	if _, err := a.Upload(ctx, owner, lesson.ID, "deck.potx", "research", []byte("PK..")); err == nil {
 		t.Fatal("a template file was accepted as a research source")
 	}
-	if _, err := a.Upload(ctx, owner, paper.ID, "paper.pdf", "", []byte("%PDF-1.4")); err != nil {
+	if _, err := a.Upload(ctx, owner, lesson.ID, "lesson.pdf", "", []byte("%PDF-1.4")); err != nil {
 		t.Fatalf("a source without a role is research: %v", err)
 	}
 }
