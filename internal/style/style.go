@@ -1,8 +1,8 @@
 package style
 
 import (
-	"errors"
 	"eduforge/internal/domain"
+	"errors"
 )
 
 var allowed = map[string]bool{"tone": true, "density": true, "visual_ratio": true, "formula_explanation": true, "background": true, "foreground": true, "accent": true, "font": true, "ratio": true, "layout": true, "figure_style": true, "notes_tone": true, "detail": true, "fixed_elements": true, "decor": true, "title_color": true}
@@ -30,8 +30,6 @@ func Defaults(kind string) domain.Style {
 		out["font"] = "Noto Sans CJK TC"
 		out["ratio"] = "16:9"
 		out["notes_tone"] = "spoken"
-	case "C":
-		out["detail"] = "standard"
 	}
 	return out
 }

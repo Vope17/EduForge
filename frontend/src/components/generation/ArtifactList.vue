@@ -62,7 +62,6 @@ const older = computed(() => props.artifacts.filter(a => !latest.value.includes(
           <a :href="`/api/artifacts/${artifact.id}/download?format=html`" download>HTML</a>
           <a :href="`/api/artifacts/${artifact.id}/download?format=pdf`" download>PDF</a>
           <a v-if="artifact.data.type === 'B'" :href="`/api/artifacts/${artifact.id}/download?format=pptx`" download>PPTX</a>
-          <a v-if="artifact.data.type === 'C'" :href="`/api/artifacts/${artifact.id}/download?format=json`" download>JSON</a>
         </div>
       </article>
     </div>

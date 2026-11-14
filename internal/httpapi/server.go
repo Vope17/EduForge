@@ -19,7 +19,6 @@ import (
 	"eduforge/internal/app"
 	"eduforge/internal/artifacts"
 	"eduforge/internal/domain"
-	"eduforge/internal/experiments"
 	"eduforge/internal/mathtex"
 	"eduforge/internal/research"
 	"eduforge/internal/store"
@@ -168,28 +167,6 @@ func (s *Server) routes() {
 		respond(w, out, err)
 		return nil
 	})
-	s.handle("POST /api/reading", func(w http.ResponseWriter, r *http.Request) error {
-		var input domain.Reading
-		if err := decode(r, w, &input); err != nil {
-			return err
-		}
-		out, err := s.App.ManualReading(r.Context(), owner(r), input)
-		respond(w, out, err)
-		return nil
-	})
-	s.handle("PUT /api/connections/ssh", func(w http.ResponseWriter, r *http.Request) error {
-		var input struct {
-			Config string `json:"config"`
-			Known  string `json:"known_hosts"`
-			Key    string `json:"private_key"`
-		}
-		if err := decode(r, w, &input); err != nil {
-			return err
-		}
-		err := s.App.SaveSSH(r.Context(), owner(r), input.Config, input.Known, input.Key)
-		respond(w, map[string]bool{"saved": err == nil}, err)
-		return nil
-	})
 	s.handle("DELETE /api/projects/{id}", func(w http.ResponseWriter, r *http.Request) error {
 		if r.URL.Query().Get("confirm") != "delete-project-data" {
 			return errors.New("deletion_confirmation_required")
@@ -294,26 +271,6 @@ func (s *Server) routes() {
 		respond(w, out, err)
 		return nil
 	})
-	s.handle("POST /api/papers/{id}/reading", func(w http.ResponseWriter, r *http.Request) error {
-		var input struct {
-			Read bool `json:"read"`
-		}
-		if err := decode(r, w, &input); err != nil {
-			return err
-		}
-		out, err := s.App.MarkRead(r.Context(), owner(r), r.PathValue("id"), input.Read)
-		respond(w, out, err)
-		return nil
-	})
-	s.handle("POST /api/projects/{id}/comparisons", func(w http.ResponseWriter, r *http.Request) error {
-		var p research.Pair
-		if err := decode(r, w, &p); err != nil {
-			return err
-		}
-		out, err := s.App.SavePair(r.Context(), owner(r), r.PathValue("id"), p)
-		respond(w, out, err)
-		return nil
-	})
 	s.handle("POST /api/templates", func(w http.ResponseWriter, r *http.Request) error {
 		r.Body = http.MaxBytesReader(w, r.Body, 65<<20)
 		if err := r.ParseMultipartForm(8 << 20); err != nil {
@@ -404,28 +361,6 @@ func (s *Server) routes() {
 			return err
 		}
 		out, err := s.App.RestoreTemplate(r.Context(), owner(r), r.PathValue("id"), input.Version, input.From)
-		respond(w, out, err)
-		return nil
-	})
-	s.handle("POST /api/papers/{id}/plan-chat/reply", func(w http.ResponseWriter, r *http.Request) error {
-		var input struct {
-			Messages []domain.ChatMessage `json:"messages"`
-			Grill    bool                 `json:"grill"`
-			Language string               `json:"language"`
-		}
-		if err := decode(r, w, &input); err != nil {
-			return err
-		}
-		reply, err := s.App.PlanChatReply(r.Context(), owner(r), r.PathValue("id"), input.Messages, input.Grill, input.Language)
-		respond(w, map[string]string{"reply": reply}, err)
-		return nil
-	})
-	s.handle("PUT /api/papers/{id}/plan-chat", func(w http.ResponseWriter, r *http.Request) error {
-		var input domain.PlanChat
-		if err := decode(r, w, &input); err != nil {
-			return err
-		}
-		out, err := s.App.SavePlanChat(r.Context(), owner(r), r.PathValue("id"), input)
 		respond(w, out, err)
 		return nil
 	})
@@ -570,69 +505,6 @@ func (s *Server) routes() {
 			return err
 		}
 		writeJSON(w, 200, rendered)
-		return nil
-	})
-	s.handle("POST /api/papers/{id}/plans", func(w http.ResponseWriter, r *http.Request) error {
-		var p domain.Plan
-		if err := decode(r, w, &p); err != nil {
-			return err
-		}
-		out, err := s.App.SavePlan(r.Context(), owner(r), r.PathValue("id"), p)
-		if err == nil {
-			var plan domain.Plan
-			_ = json.Unmarshal(out.Data, &plan)
-			writeJSON(w, 200, map[string]any{"record": out, "hash": experiments.Hash(plan)})
-			return nil
-		}
-		return err
-	})
-	s.handle("POST /api/plans/{id}/confirm", func(w http.ResponseWriter, r *http.Request) error {
-		var input struct {
-			Hash string `json:"hash"`
-		}
-		if err := decode(r, w, &input); err != nil {
-			return err
-		}
-		out, err := s.App.ConfirmPlan(r.Context(), owner(r), r.PathValue("id"), input.Hash)
-		respond(w, out, err)
-		return nil
-	})
-	s.handle("GET /api/plans/{id}", func(w http.ResponseWriter, r *http.Request) error {
-		record, err := s.App.Store.Get(r.Context(), owner(r), r.PathValue("id"), "plan")
-		if err != nil {
-			return err
-		}
-		p, err := domain.Decode[domain.Plan](record.Data)
-		if err != nil {
-			return err
-		}
-		writeJSON(w, 200, map[string]any{"record": record, "hash": experiments.Hash(p)})
-		return nil
-	})
-	s.handle("POST /api/hosts/probe", func(w http.ResponseWriter, r *http.Request) error {
-		var h domain.Host
-		if err := decode(r, w, &h); err != nil {
-			return err
-		}
-		out, err := s.App.ProbeHost(r.Context(), owner(r), h)
-		respond(w, out, err)
-		return nil
-	})
-	s.handle("POST /api/plans/{id}/run", func(w http.ResponseWriter, r *http.Request) error {
-		out, err := s.App.StartRun(r.Context(), owner(r), r.PathValue("id"))
-		respond(w, out, err)
-		return nil
-	})
-	s.handle("POST /api/plans/{id}/evidence", s.manualEvidence)
-	s.handle("POST /api/runs/{id}/control", func(w http.ResponseWriter, r *http.Request) error {
-		var input struct {
-			Action string `json:"action"`
-		}
-		if err := decode(r, w, &input); err != nil {
-			return err
-		}
-		out, err := s.App.ControlRun(r.Context(), owner(r), r.PathValue("id"), input.Action)
-		respond(w, out, err)
 		return nil
 	})
 	s.handle("GET /api/projects/{id}/export", func(w http.ResponseWriter, r *http.Request) error {
@@ -852,36 +724,6 @@ func (s *Server) file(w http.ResponseWriter, r *http.Request) error {
 	}
 	w.Header().Set("Cache-Control", "private, max-age=300")
 	http.ServeFile(w, r, file)
-	return nil
-}
-func (s *Server) manualEvidence(w http.ResponseWriter, r *http.Request) error {
-	r.Body = http.MaxBytesReader(w, r.Body, 33<<20)
-	if err := r.ParseMultipartForm(8 << 20); err != nil {
-		return errors.New("invalid_upload")
-	}
-	defer r.MultipartForm.RemoveAll()
-	read := func(name string) ([]byte, error) {
-		f, _, err := r.FormFile(name)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-		return io.ReadAll(io.LimitReader(f, 16<<20))
-	}
-	log, err := read("log")
-	if err != nil {
-		return errors.New("log_required")
-	}
-	csv, err := read("csv")
-	if err != nil {
-		return errors.New("csv_required")
-	}
-	var conditions domain.Conditions
-	if json.Unmarshal([]byte(r.FormValue("conditions")), &conditions) != nil {
-		return errors.New("conditions_required")
-	}
-	out, err := s.App.ManualEvidence(r.Context(), owner(r), r.PathValue("id"), log, csv, conditions, r.FormValue("execution_status"))
-	respond(w, out, err)
 	return nil
 }
 func (s *Server) importProject(w http.ResponseWriter, r *http.Request) error {

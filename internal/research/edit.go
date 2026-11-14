@@ -95,7 +95,7 @@ func EditPrompt(k domain.Knowledge, artifactType, lang, instruction string, bloc
 	if lang == "zh-TW" {
 		language = "Traditional Chinese (Taiwan)"
 	}
-	what := map[string]string{"A": "an illustrated paper reading guide", "B": "a slide deck with speaker notes", "C": "an experiment reproduction plan"}[artifactType]
+	what := map[string]string{"A": "an illustrated paper reading guide", "B": "a slide deck with speaker notes"}[artifactType]
 	if what == "" {
 		what = "a document"
 	}

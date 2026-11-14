@@ -37,18 +37,13 @@ export interface Summary {
   task?: Rec<D.Task>[] | null
   step?: Rec<D.Step>[] | null
   artifact?: Rec<D.Artifact>[] | null
-  plan?: Rec<D.Plan>[] | null
-  run?: Rec<D.Run>[] | null
-  plan_chat?: Rec<D.PlanChat>[] | null
   folder?: Rec<D.Folder>[] | null
   event?: Rec<EventData>[] | null
   profile?: Rec<D.Profile>[] | null
   profile_version?: Rec<D.ProfileVersion>[] | null
   template?: Rec<D.Template>[] | null
   provider?: Rec<D.Provider>[] | null
-  reading?: Rec<D.Reading>[] | null
   preference?: Rec<PreferenceData>[] | null
-  pairs?: D.Pair[] | null
 }
 
 /** GET /api/session */

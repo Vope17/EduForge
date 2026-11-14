@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useWorkspace } from '../../lib/workspace.ts'
 import { paperSteps } from '../../lib/status.ts'
-import { isRead, folderList, groupPapers, collapsed, toggleCollapsed, libraryActions } from '../../lib/library.ts'
+import { folderList, groupPapers, collapsed, toggleCollapsed, libraryActions } from '../../lib/library.ts'
 import Icon from '../Icon.vue'
 import NewPaperDialog from '../dialogs/NewPaperDialog.vue'
 import NewProjectDialog from '../dialogs/NewProjectDialog.vue'
@@ -92,7 +92,7 @@ function toggle(id: string) {
           >
             <input type="checkbox" :checked="state.selected.includes(paper.id)" :aria-label="t('selectForBatch') + ' · ' + paper.data.title" @change="toggle(paper.id)">
             <button class="paper-link-main" @click="openPaper(paper.id)">
-              <span class="paper-link-title"><span v-if="isRead(state.snapshot, paper.id)" class="read-mark" :title="t('readDone')"><Icon name="check" /><span class="sr-only">{{ t('readDone') }}</span></span>{{ paper.data.title }}</span>
+              <span class="paper-link-title">{{ paper.data.title }}</span>
               <span class="step-dots" aria-hidden="true">
                 <i v-for="step in steps(paper)" :key="step.key" :class="step.state"></i>
               </span>

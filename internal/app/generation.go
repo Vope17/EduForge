@@ -53,7 +53,7 @@ func (a *App) CreateRequest(ctx context.Context, owner, project string, req doma
 		return domain.Record{}, errors.New("invalid_language")
 	}
 	for kind, lang := range req.Languages {
-		if kind != "A" && kind != "B" && kind != "C" {
+		if kind != "A" && kind != "B" {
 			return domain.Record{}, errors.New("invalid_output")
 		}
 		if lang != "" && !domain.Language(lang) {
@@ -74,44 +74,13 @@ func (a *App) CreateRequest(ctx context.Context, owner, project string, req doma
 	req.Targets = targets
 	if req.UsePaperSettings {
 		req.Selected = nil
-		for _, kind := range []string{"A", "B", "C"} {
+		for _, kind := range []string{"A", "B"} {
 			for _, target := range targets {
 				if slices.Contains(target.Settings.Selected, kind) {
 					req.Selected = append(req.Selected, kind)
 					break
 				}
 			}
-		}
-	}
-	if req.Combined {
-		if len(req.PaperIDs) < 2 {
-			return domain.Record{}, errors.New("related_group_requires_multiple_studies")
-		}
-		pairs, e := a.Pairs(ctx, owner, project)
-		if e != nil {
-			return domain.Record{}, e
-		}
-		selected := map[string]bool{}
-		for _, id := range req.PaperIDs {
-			selected[id] = true
-		}
-		connected := map[string]bool{req.PaperIDs[0]: true}
-		for pass := 0; pass < len(req.PaperIDs); pass++ {
-			for _, pair := range pairs {
-				if pair.Related && selected[pair.A] && selected[pair.B] && (connected[pair.A] || connected[pair.B]) {
-					connected[pair.A] = true
-					connected[pair.B] = true
-				}
-			}
-		}
-		if len(connected) != len(selected) {
-			return domain.Record{}, errors.New("confirm_related_group_first")
-		}
-		if req.UsePaperSettings {
-			return domain.Record{}, errors.New("combined_uses_batch_settings")
-		}
-		if !slices.Contains(req.Selected, "A") && !slices.Contains(req.Selected, "B") {
-			return domain.Record{}, errors.New("combined_requires_reader_or_presentation")
 		}
 	}
 	refs, err := a.ProviderRefs(ctx, owner)
@@ -281,42 +250,14 @@ func (a *App) StartRequest(ctx context.Context, owner, requestID, ui string, use
 	}
 	out := []domain.Record{}
 	known := []string{}
-	history, err := a.Store.List(ctx, owner, store.Filter{Kind: "reading"})
-	if err != nil {
-		return nil, err
-	}
-	for _, item := range history {
-		h, _ := domain.Decode[domain.Reading](item.Data)
-		known = append(known, h.Terms...)
-	}
 	for _, target := range targets {
 		for _, kind := range target.Settings.Selected {
 			total := 6
-			if kind == "C" {
-				total = 1
-			}
 			t := domain.Task{RequestID: requestID, Type: kind, Status: "queued", Stage: "generate", Language: language(req, target, kind), KnowledgeID: target.KnowledgeID, Settings: target.Settings, Style: targetStyle(req, target, kind), Total: total}
 			if kind == "A" {
 				t.ReadTerms = known
 			}
 			out = append(out, domain.Record{Project: r.Project, Paper: target.PaperID, Data: domain.Encode(t)})
-		}
-	}
-	if req.Combined {
-		ids := []string{}
-		for _, target := range targets {
-			ids = append(ids, target.KnowledgeID)
-		}
-		for _, kind := range req.Selected {
-			if kind == "C" {
-				continue
-			}
-			target := targets[0]
-			task := domain.Task{RequestID: requestID, Type: kind, Status: "queued", Stage: "generate", Language: language(req, target, kind), KnowledgeID: ids[0], RelatedKnowledge: ids[1:], GroupedPapers: req.PaperIDs, Settings: target.Settings, Style: targetStyle(req, target, kind), Total: 6}
-			if kind == "A" {
-				task.ReadTerms = known
-			}
-			out = append(out, domain.Record{Project: r.Project, Paper: req.PaperIDs[0], Data: domain.Encode(task)})
 		}
 	}
 	req.Status = "running"
@@ -487,23 +428,6 @@ func (a *App) tick(ctx context.Context) {
 		return
 	}
 	for _, owner := range owners {
-		a.pollMu.Lock()
-		if !a.polling {
-			a.polling = true
-			a.wg.Add(1)
-			go func() {
-				defer a.wg.Done()
-				defer func() {
-					a.pollMu.Lock()
-					a.polling = false
-					a.pollMu.Unlock()
-				}()
-				for _, user := range owners {
-					a.pollRuns(ctx, user)
-				}
-			}()
-		}
-		a.pollMu.Unlock()
 		tasks, err := a.Store.List(ctx, owner, store.Filter{Kind: "task"})
 		if err != nil {
 			continue
@@ -587,16 +511,6 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 	}
 	kind := strings.TrimPrefix(t.Type, "preview:")
 	preview := strings.HasPrefix(t.Type, "preview:")
-	// A reproduction plan (C) is written chapter by chapter, taking the
-	// user's saved planning conversation into account.
-	var chat *domain.PlanChat
-	if kind == "C" && t.Settings.PlanChatID != "" {
-		_, c, err := get[domain.PlanChat](ctx, a, owner, t.Settings.PlanChatID, "plan_chat")
-		if err != nil {
-			return err
-		}
-		chat = &c
-	}
 	steps, err := a.Store.List(ctx, owner, store.Filter{Kind: "step", Parent: id})
 	if err != nil {
 		return err
@@ -617,18 +531,12 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 		}
 	} else {
 		// Readers and decks are written section by section in SectionOrder
-		// (related work only when the paper discusses it); plans chapter by
-		// chapter. A style preview writes the first section only.
+		// (related work only when the paper discusses it). A style preview
+		// writes the first section only.
 		order := []int{}
-		if kind == "C" {
-			for i := range research.PlanChapters {
+		for _, i := range research.SectionOrder {
+			if i != research.RelatedSection || research.HasEvidence(k, i) {
 				order = append(order, i)
-			}
-		} else {
-			for _, i := range research.SectionOrder {
-				if i != research.RelatedSection || research.HasEvidence(k, i) {
-					order = append(order, i)
-				}
 			}
 		}
 		if preview {
@@ -645,22 +553,9 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 				return nil
 			}
 			req := research.Request{Knowledge: k, Index: i, Lang: t.Language, Kind: kind, Settings: t.Settings, Style: t.Style.Resolved[kind], Known: t.ReadTerms, Slides: slides[i]}
-			if kind == "C" {
-				ch := research.PlanChapters[i]
-				req.Section = research.Excerpt(k, ch.Excerpt, "deep", t.Language)
-				req.Section.Title = ch.TitleEN
-				if t.Language == "zh-TW" {
-					req.Section.Title = ch.TitleZH
-				}
-				req.Index, req.Known = -1, nil
-			} else {
-				req.Section = research.Excerpt(k, i, t.Settings.Depth, t.Language)
-			}
+			req.Section = research.Excerpt(k, i, t.Settings.Depth, t.Language)
 			passages, pages := req.Evidence()
 			prompt := req.Prompt(passages, pages)
-			if kind == "C" {
-				prompt = research.PlanPrompt(prompt, research.PlanChapters[i], chat)
-			}
 			images := []string{}
 			for _, u := range pages {
 				if path, err := a.Store.Path(u.Preview); err == nil {
@@ -701,13 +596,7 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 			}
 		}
 	}
-	// Related research is the paper's own related work (a section above);
-	// only a reproduction plan adds comparisons with related studies in the
-	// library.
 	related := append([]string{}, t.RelatedKnowledge...)
-	if !preview && kind == "C" {
-		related = append(related, a.addComparisons(ctx, owner, r.Project, r.Paper, t.KnowledgeID, &sections, t.Language)...)
-	}
 	art := domain.Artifact{GroupedPapers: t.GroupedPapers, RelatedKnowledge: related, Type: kind, Language: t.Language, KnowledgeID: t.KnowledgeID, RequestID: t.RequestID, TaskID: id, Style: t.Style, Settings: t.Settings, Sections: sections, Mode: mode}
 	support, err := a.ArtifactKnowledge(ctx, owner, art)
 	if err != nil {
@@ -721,10 +610,6 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 			// change them.
 			for i, paths := range artifacts.MentionedFigures(art, support) {
 				art.Sections[i].Figures = paths
-			}
-		case "C":
-			for i := range art.Sections {
-				art.Sections[i].Figures = []string{} // plans are text only
 			}
 		case "B":
 			art.Sections = artifacts.BuildDeck(art.Sections, support, k.Title, t.Language, func(path string) float64 { return artifacts.ImageAspect(a.Store, path) }, artifacts.GeometryOf(art.Style.Resolved["B"]))
@@ -1034,89 +919,6 @@ func (a *App) parseTask(ctx context.Context, owner string, task domain.Record) e
 		return nil
 	})
 	return err
-}
-func (a *App) addComparisons(ctx context.Context, owner, project, paper, knowledgeID string, sections *[]domain.Section, lang string) []string {
-	ids := []string{}
-	pairs, err := a.Pairs(ctx, owner, project)
-	if err != nil {
-		return ids
-	}
-	for _, pair := range pairs {
-		if !pair.Related || (pair.A != paper && pair.B != paper) {
-			continue
-		}
-		title := "Related research comparison"
-		note := "Compare concepts. Dataset, split, metric and evaluation settings must match before comparing values."
-		if lang == "zh-TW" {
-			title = "相關研究比較"
-			note = "可比較概念。資料集、切分、指標與評估條件相符後，再核對數值。"
-		}
-		if pair.Numeric {
-			note = "The recorded comparison conditions match. The excerpts below preserve each source's methods, results and limitations."
-			if lang == "zh-TW" {
-				note = "已記錄相符的比較條件。以下分列各研究來源的方法、結果與限制。"
-			}
-		}
-		if pair.Incomplete {
-			note = "Comparison evidence is incomplete because a source is missing or failed."
-			if lang == "zh-TW" {
-				note = "來源缺失或解析失敗，比較證據尚不完整。"
-			}
-		}
-		parts := []string{note}
-		cites := []string{}
-		conditions := []domain.Conditions{}
-		for _, paperID := range []string{pair.A, pair.B} {
-			_, study, err := get[domain.Paper](ctx, a, owner, paperID, "paper")
-			if err != nil || study.KnowledgeID == "" {
-				continue
-			}
-			if paperID == paper {
-				study.KnowledgeID = knowledgeID
-			}
-			_, knowledge, err := get[domain.Knowledge](ctx, a, owner, study.KnowledgeID, "knowledge")
-			if err != nil {
-				continue
-			}
-			if paperID != paper {
-				ids = append(ids, study.KnowledgeID)
-			}
-			conditions = append(conditions, knowledge.Conditions)
-			parts = append(parts, knowledge.Title)
-			labels := map[int]string{2: "Method", 4: "Results", 5: "Limitations"}
-			if lang == "zh-TW" {
-				labels = map[int]string{2: "方法", 4: "結果", 5: "限制"}
-			}
-			for _, section := range []int{2, 4, 5} {
-				for _, claim := range knowledge.Claims {
-					if claim.Section != section {
-						continue
-					}
-					parts = append(parts, labels[section]+" · "+research.Clip(claim.Text, 650))
-					for _, cite := range claim.Citations {
-						if !slices.Contains(cites, cite) {
-							cites = append(cites, cite)
-						}
-					}
-					break
-				}
-			}
-		}
-		if len(conditions) == 2 {
-			pair.Differences = research.Compare(conditions[0], conditions[1])
-			if len(pair.Differences) > 0 {
-				parts[0] = "Evaluation conditions differ or are missing. Compare concepts and review the differences below."
-				if lang == "zh-TW" {
-					parts[0] = "評估條件不同或不完整。請比較概念，並核對以下條件差異。"
-				}
-			}
-		}
-		for _, difference := range pair.Differences {
-			parts = append(parts, difference.Field+" · "+difference.A+" / "+difference.B)
-		}
-		*sections = append(*sections, domain.Section{Title: title, Body: strings.Join(parts, "\n\n"), Citations: cites})
-	}
-	return ids
 }
 
 func (a *App) EditArtifact(ctx context.Context, owner, id string, version int, input domain.Artifact) (domain.Record, error) {

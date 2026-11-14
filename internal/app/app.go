@@ -3,7 +3,6 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -27,8 +26,6 @@ type App struct {
 	running    map[string]bool
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup
-	pollMu     sync.Mutex
-	polling    bool
 	feedbackMu sync.Mutex
 }
 
@@ -130,7 +127,7 @@ func validKinds(kinds []string) error {
 		return errors.New("select_output")
 	}
 	for _, kind := range kinds {
-		if kind != "A" && kind != "B" && kind != "C" {
+		if kind != "A" && kind != "B" {
 			return errors.New("invalid_output")
 		}
 		if seen[kind] {
@@ -147,7 +144,7 @@ func validateOutputSettings(s domain.OutputSettings) error {
 		}
 	}
 	for kind, lang := range s.Languages {
-		if !slices.Contains([]string{"A", "B", "C"}, kind) {
+		if !slices.Contains([]string{"A", "B"}, kind) {
 			return errors.New("invalid_output")
 		}
 		if lang != "" && !domain.Language(lang) {
@@ -306,91 +303,6 @@ func (a *App) SaveKnowledge(ctx context.Context, owner, paperID string, expected
 	}
 	return r, err
 }
-func (a *App) Pairs(ctx context.Context, owner, project string) ([]research.Pair, error) {
-	papers, err := a.Store.List(ctx, owner, store.Filter{Kind: "paper", Project: project})
-	if err != nil {
-		return nil, err
-	}
-	ids := []string{}
-	knowledge := map[string]domain.Knowledge{}
-	for _, r := range papers {
-		p, _ := domain.Decode[domain.Paper](r.Data)
-		ids = append(ids, r.ID)
-		k := domain.Knowledge{Title: p.Title}
-		if p.KnowledgeID != "" {
-			_, k, err = get[domain.Knowledge](ctx, a, owner, p.KnowledgeID, "knowledge")
-			if err != nil {
-				return nil, err
-			}
-		}
-		knowledge[r.ID] = k
-	}
-	pairs := research.Suggest(ids, knowledge)
-	overrides, err := a.Store.List(ctx, owner, store.Filter{Kind: "comparison", Project: project})
-	if err != nil {
-		return nil, err
-	}
-	for i := range pairs {
-		for _, r := range overrides {
-			var p research.Pair
-			_ = json.Unmarshal(r.Data, &p)
-			if p.A == pairs[i].A && p.B == pairs[i].B {
-				pairs[i].Related = p.Related
-				if len(p.Basis) > 0 {
-					pairs[i].Basis = p.Basis
-				}
-			}
-		}
-	}
-	return pairs, nil
-}
-func (a *App) SavePair(ctx context.Context, owner, project string, p research.Pair) (domain.Record, error) {
-	if p.A == p.B {
-		return domain.Record{}, errors.New("distinct_papers_required")
-	}
-	for _, id := range []string{p.A, p.B} {
-		paper, err := a.Store.Get(ctx, owner, id, "paper")
-		if err != nil {
-			return domain.Record{}, err
-		}
-		if paper.Project != project {
-			return domain.Record{}, domain.ErrNotFound
-		}
-	}
-	return a.create(ctx, owner, "comparison", project, project, "", research.Pair{A: p.A, B: p.B, Related: p.Related, Basis: p.Basis})
-}
-func (a *App) MarkRead(ctx context.Context, owner, paperID string, read bool) (domain.Record, error) {
-	paper, p, err := get[domain.Paper](ctx, a, owner, paperID, "paper")
-	if err != nil {
-		return domain.Record{}, err
-	}
-	items, err := a.Store.List(ctx, owner, store.Filter{Kind: "reading"})
-	if err != nil {
-		return domain.Record{}, err
-	}
-	for _, r := range items {
-		v, _ := domain.Decode[domain.Reading](r.Data)
-		if v.PaperID == paperID {
-			if read {
-				return r, nil
-			}
-			return domain.Record{}, a.Store.Delete(ctx, owner, r.ID)
-		}
-	}
-	if !read {
-		return domain.Record{}, nil
-	}
-	terms := []string{}
-	if p.KnowledgeID != "" {
-		_, k, e := get[domain.Knowledge](ctx, a, owner, p.KnowledgeID, "knowledge")
-		if e == nil {
-			for _, t := range k.Terms {
-				terms = append(terms, t.Original)
-			}
-		}
-	}
-	return a.create(ctx, owner, "reading", "", "", "", domain.Reading{Title: p.Title, PaperID: paper.ID, Terms: terms, CompletedAt: domain.Now()})
-}
 
 // ImportTemplate stores a PowerPoint template (.pptx or .potx) and reads its
 // layouts, colours and fonts so decks can be built on it.
@@ -484,16 +396,6 @@ func (a *App) DeleteProject(ctx context.Context, owner, id string) error {
 			return errors.New("cancel_active_tasks_before_delete")
 		}
 	}
-	runs, err := a.Store.List(ctx, owner, store.Filter{Kind: "run", Project: id})
-	if err != nil {
-		return err
-	}
-	for _, r := range runs {
-		run, _ := domain.Decode[domain.Run](r.Data)
-		if run.Progress != "finished" && run.Progress != "manual" && run.Progress != "needs_environment" {
-			return errors.New("active_experiment_prevents_delete")
-		}
-	}
 	return a.Store.Delete(ctx, owner, id)
 }
 func (a *App) Summary(ctx context.Context, owner, project string) (map[string]any, error) {
@@ -505,26 +407,19 @@ func (a *App) Summary(ctx context.Context, owner, project string) (map[string]an
 		}
 		out["project"] = p
 	}
-	for _, kind := range []string{"paper", "source", "knowledge", "request", "preview", "task", "step", "artifact", "plan", "run", "plan_chat", "folder", "event"} {
+	for _, kind := range []string{"paper", "source", "knowledge", "request", "preview", "task", "step", "artifact", "folder", "event"} {
 		r, err := a.Store.List(ctx, owner, store.Filter{Kind: kind, Project: project})
 		if err != nil {
 			return nil, err
 		}
 		out[kind] = r
 	}
-	for _, kind := range []string{"profile", "profile_version", "template", "provider", "reading", "preference"} {
+	for _, kind := range []string{"profile", "profile_version", "template", "provider", "preference"} {
 		r, err := a.Store.List(ctx, owner, store.Filter{Kind: kind})
 		if err != nil {
 			return nil, err
 		}
 		out[kind] = r
-	}
-	if project != "" {
-		pairs, err := a.Pairs(ctx, owner, project)
-		if err != nil {
-			return nil, err
-		}
-		out["pairs"] = pairs
 	}
 	return out, nil
 }

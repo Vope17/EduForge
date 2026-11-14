@@ -17,22 +17,6 @@ func TestPresentationTimeUsesNotesAndCountsChinese(t *testing.T) {
 	}
 }
 
-func TestNumericComparisonRequiresEveryCondition(t *testing.T) {
-	a := domain.Conditions{Task: "classification", Dataset: "demo", Split: "test-v1", Metric: "accuracy", Evaluation: "single-run"}
-	if len(Compare(a, a)) != 0 {
-		t.Fatal("identical conditions rejected")
-	}
-	b := a
-	b.Split = "validation"
-	if len(Compare(a, b)) != 1 {
-		t.Fatal("different split not flagged")
-	}
-	b = a
-	b.Evaluation = ""
-	if len(Compare(a, b)) != 1 {
-		t.Fatal("missing evaluation accepted")
-	}
-}
 func TestWrongNumbersReferencesAndTermsStayDraft(t *testing.T) {
 	k := domain.Knowledge{Units: []domain.Unit{{ID: "source:p1", Text: "Accuracy is 0.91 using CanonicalMethod."}}, Terms: []domain.Term{{Original: "CanonicalMethod", Deprecated: []string{"WrongMethod"}}}}
 	a := domain.Artifact{Type: "A", Language: "en", Mode: "model", Sections: []domain.Section{{Body: "WrongMethod achieved 0.99.", Citations: []string{"source:p1"}}, {Body: "Unknown", Citations: []string{"unknown:p3"}}}}

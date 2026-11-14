@@ -51,59 +51,6 @@ func TestTextCannotAuthorizeAnotherUsersFile(t *testing.T) {
 	}
 }
 
-func TestPausedExperimentStillProtectsItsProject(t *testing.T) {
-	a, owner, project, paper := fixture(t)
-	ctx := context.Background()
-	run, err := a.create(ctx, owner, "run", paper.ID, project.ID, paper.ID, domain.Run{RunID: domain.ID(), Progress: "paused"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := a.DeleteProject(ctx, owner, project.ID); err == nil {
-		t.Fatal("project deletion orphaned a paused experiment")
-	}
-	if _, err := set[domain.Run](ctx, a, owner, run.ID, 0, func(run *domain.Run) error {
-		run.Progress = "finished"
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := a.DeleteProject(ctx, owner, project.ID); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestImportedRunningExperimentRequiresEnvironmentConfirmation(t *testing.T) {
-	a, owner, project, paper := fixture(t)
-	ctx := context.Background()
-	runID := domain.ID()
-	run, err := a.create(ctx, owner, "run", paper.ID, project.ID, paper.ID, domain.Run{RunID: runID, Host: domain.Host{Mode: "local"}, Progress: "running"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err := a.Export(ctx, owner, project.ID, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	imported, err := a.Import(ctx, owner, b, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rows, err := a.Store.List(ctx, owner, store.Filter{Kind: "run", Project: imported.ID})
-	if err != nil || len(rows) != 1 {
-		t.Fatal("run checkpoint record was lost")
-	}
-	state, _ := domain.Decode[domain.Run](rows[0].Data)
-	if state.Progress != "needs_environment" || state.RunID != runID {
-		t.Fatal("import could dispatch an unconfirmed environment")
-	}
-	if _, err = a.ControlRun(ctx, owner, rows[0].ID, "resume"); err == nil {
-		t.Fatal("unconfirmed imported run resumed")
-	}
-	if _, err = a.Store.Get(ctx, owner, run.ID, "run"); err != nil {
-		t.Fatal("import changed the original run")
-	}
-}
-
 func fixture(t *testing.T) (*App, string, domain.Record, domain.Record) {
 	t.Helper()
 	ctx := context.Background()

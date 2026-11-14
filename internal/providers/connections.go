@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"eduforge/internal/domain"
 	"encoding/json"
 	"errors"
 	"io"
@@ -9,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"eduforge/internal/domain"
 	"strings"
 	"time"
 )

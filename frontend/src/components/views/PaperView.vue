@@ -2,12 +2,11 @@
 import { computed } from 'vue'
 import { useWorkspace } from '../../lib/workspace.ts'
 import { paperSteps, nextStep } from '../../lib/status.ts'
-import { isRead, folderList, libraryActions } from '../../lib/library.ts'
+import { folderList, libraryActions } from '../../lib/library.ts'
 import Icon from '../Icon.vue'
 import StepSources from '../paper/StepSources.vue'
 import StepOutputs from '../paper/StepOutputs.vue'
 import KnowledgePanel from '../KnowledgePanel.vue'
-import ReproductionPlan from '../plan/ReproductionPlan.vue'
 import type { IconName } from '../../lib/icons.ts'
 import type { Step } from '../../lib/router.ts'
 import type { Paper } from '../../api/types.ts'
@@ -18,14 +17,13 @@ const { movePaper } = libraryActions(workspace)
 const folders = computed(() => folderList(state.snapshot))
 const steps = computed(() => paperSteps(paper.value, state.snapshot))
 const current = computed(() => steps.value.find(s => s.key === route.step) || steps.value[0])
-const icons: Record<Step, IconName> = { sources: 'file', knowledge: 'brain', outputs: 'layers', experiment: 'flask' }
+const icons: Record<Step, IconName> = { sources: 'file', knowledge: 'brain', outputs: 'layers' }
 // Where to send the user to unblock the current step: the first step that
 // still needs work (a blocked step's direct predecessor may itself be blocked).
 const fixStep = computed(() => {
   const target = nextStep(steps.value)
   return target !== current.value?.key ? target : ''
 })
-const read = computed(() => !!paper.value && isRead(state.snapshot, paper.value.id))
 async function updatePaper(patch: Partial<Paper>) {
   if (!paper.value) return
   const { id, version, data } = paper.value
@@ -38,18 +36,13 @@ async function removePaper() {
   const result = await act(() => api(`/papers/${id}?confirm=delete-paper-data`, { method: 'DELETE' }))
   if (result) go({ name: 'home', project: state.projectID }, { replace: true })
 }
-async function toggleRead() {
-  if (!paper.value) return
-  const id = paper.value.id
-  await act(() => api(`/papers/${id}/reading`, { method: 'POST', body: { read: !read.value } }))
-}
 </script>
 
 <template>
   <section v-if="paper" class="page-content paper-view">
     <div class="paper-head">
       <div class="grow">
-        <h1><span v-if="read" class="read-mark" :title="t('readDone')" :aria-label="t('readDone')"><Icon name="check" /></span>{{ paper.data.title }}</h1>
+        <h1>{{ paper.data.title }}</h1>
         <div class="paper-meta">
           <label class="inline-field">{{ t('group') }}
             <input :value="paper.data.group" :placeholder="t('independent')" @change="updatePaper({ group: ($event.target as HTMLInputElement).value })">
@@ -63,7 +56,6 @@ async function toggleRead() {
               <option v-for="folder in folders" :key="folder.id" :value="folder.id">{{ folder.data.name }}</option>
             </select>
           </label>
-          <button class="chip-button" :class="{ on: read }" :title="t(read ? 'unread' : 'markRead')" @click="toggleRead">✓ {{ t(read ? 'readDone' : 'markRead') }}</button>
         </div>
       </div>
       <button class="text-button danger" @click="removePaper">{{ t('deletePaper') }}</button>
@@ -97,7 +89,6 @@ async function toggleRead() {
       <StepSources v-if="route.step === 'sources'" />
       <KnowledgePanel v-else-if="route.step === 'knowledge' && current.state !== 'blocked'" />
       <StepOutputs v-else-if="route.step === 'outputs' && current.state !== 'blocked'" />
-      <ReproductionPlan v-else-if="route.step === 'experiment' && current.state !== 'blocked'" />
     </div>
   </section>
 </template>

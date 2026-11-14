@@ -22,12 +22,8 @@ export function paperSteps(paper: Rec<Paper> | undefined, snapshot: Summary): St
   const tasks = (snapshot.task || []).filter(t => t.paper_id === id)
   const parsing = tasks.some(t => t.data.type === 'parse' && ACTIVE.includes(t.data.status))
   const knowledge = (snapshot.knowledge || []).find(k => k.id === paper.data.knowledge_id)
-  const generating = tasks.some(t => t.data.type !== 'parse' && t.data.type !== 'C' && ACTIVE.includes(t.data.status))
-  const all = (snapshot.artifact || []).filter(a => a.paper_id === id || a.data.grouped_paper_ids?.includes(id))
-  const artifacts = all.filter(a => a.data.type !== 'C')
-  // The experiment step writes the reproduction plan (output C).
-  const planning = tasks.some(t => t.data.type === 'C' && ACTIVE.includes(t.data.status))
-  const plans = all.filter(a => a.data.type === 'C')
+  const generating = tasks.some(t => t.data.type !== 'parse' && ACTIVE.includes(t.data.status))
+  const artifacts = (snapshot.artifact || []).filter(a => a.paper_id === id || a.data.grouped_paper_ids?.includes(id))
 
   const s = {} as Record<Step, Omit<StepStatus, 'key'>>
   if (parsing) s.sources = { state: 'running', reason: 'stepParsing' }
@@ -44,10 +40,6 @@ export function paperSteps(paper: Rec<Paper> | undefined, snapshot: Summary): St
   else if (artifacts.length) s.outputs = { state: 'done' }
   else s.outputs = { state: 'todo' }
 
-  if (!knowledge?.data.confirmed) s.experiment = { state: 'blocked', reason: 'confirm_knowledge_first' }
-  else if (planning) s.experiment = { state: 'running', reason: 'stepPlanning' }
-  else if (plans.length) s.experiment = { state: 'done' }
-  else s.experiment = { state: 'todo' }
 
   return STEPS.map(key => ({ key, ...s[key] }))
 }

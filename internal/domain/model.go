@@ -74,13 +74,10 @@ type OutputSettings struct {
 	Audience   string            `json:"audience"`
 	Minutes    int               `json:"minutes"`
 	TemplateID string            `json:"template_id"`
-	// PlanChatID is a saved planning conversation a reproduction plan (C)
-	// takes into account.
-	PlanChatID string `json:"plan_chat_id,omitempty"`
 	// ReaderTemplateID is an imported Word template for readers (A).
 	ReaderTemplateID string `json:"reader_template_id,omitempty"`
 	// Instructions are the user's own wishes for each kind of output
-	// ("A", "B", "C"), passed to the model as written.
+	// ("A", "B"), passed to the model as written.
 	Instructions map[string]string `json:"instructions,omitempty"`
 }
 type Unit struct {
@@ -222,7 +219,6 @@ type Request struct {
 	PaperIDs         []string           `json:"paper_ids"`
 	UsePaperSettings bool               `json:"use_paper_settings,omitempty"`
 	Targets          []GenerationTarget `json:"targets,omitempty"`
-	Combined         bool               `json:"combined"`
 	Selected         []string           `json:"selected"`
 	Languages        map[string]string  `json:"languages"`
 	UILanguage       string             `json:"ui_language"`
@@ -478,86 +474,4 @@ type TemplateVersion struct {
 	Version  int             `json:"version"`
 	SavedAt  string          `json:"saved_at"`
 	Template json.RawMessage `json:"template"`
-}
-type Reading struct {
-	Title       string   `json:"title"`
-	PaperID     string   `json:"paper_id"`
-	Terms       []string `json:"terms"`
-	CompletedAt string   `json:"completed_at"`
-}
-type Host struct {
-	Mode            string  `json:"mode"`
-	SSH             string  `json:"ssh_alias"`
-	Workdir         string  `json:"workdir"`
-	OS              string  `json:"os"`
-	CPU             string  `json:"cpu"`
-	GPU             string  `json:"gpu"`
-	MemoryGB        float64 `json:"memory_gb"`
-	Environment     string  `json:"environment"`
-	EnvironmentName string  `json:"environment_name"`
-	AllowedRoot     string  `json:"allowed_root"`
-	Concurrency     int     `json:"concurrency"`
-}
-type Estimate struct {
-	Phase      string `json:"phase"`
-	Machine    string `json:"machine"`
-	Human      string `json:"human"`
-	Basis      string `json:"basis"`
-	Confidence string `json:"confidence"`
-}
-type Plan struct {
-	Target         string     `json:"target"`
-	Citation       string     `json:"citation"`
-	Repo           string     `json:"repo"`
-	Commit         string     `json:"commit"`
-	Host           Host       `json:"host"`
-	Commands       [][]string `json:"commands"`
-	ResumeCommands [][]string `json:"resume_commands,omitempty"`
-	Data           string     `json:"data"`
-	Weights        string     `json:"weights"`
-	Dependencies   string     `json:"dependencies"`
-	Downloads      string     `json:"downloads"`
-	OutputCSV      string     `json:"output_csv"`
-	Metric         string     `json:"metric"`
-	Expected       *float64   `json:"expected"`
-	Tolerance      float64    `json:"tolerance"`
-	Conditions     Conditions `json:"conditions"`
-	Estimates      []Estimate `json:"estimates"`
-	Missing        []string   `json:"missing"`
-	Compatibility  []Issue    `json:"compatibility"`
-	Confirmed      bool       `json:"confirmed"`
-	ConfirmedHash  string     `json:"confirmed_hash"`
-	Previous       string     `json:"previous_id,omitempty"`
-}
-type Run struct {
-	PlanID            string   `json:"plan_id"`
-	PlanHash          string   `json:"plan_hash"`
-	RunID             string   `json:"run_id"`
-	Host              Host     `json:"host"`
-	Status            string   `json:"status"`
-	Progress          string   `json:"progress"`
-	Comparison        string   `json:"comparison"`
-	Reason            string   `json:"reason"`
-	Evidence          []string `json:"evidence"`
-	GitCommit         string   `json:"git_commit"`
-	Branch            string   `json:"branch"`
-	Actual            *float64 `json:"actual"`
-	Started           string   `json:"started_at"`
-	Dispatched        string   `json:"dispatched_at,omitempty"`
-	OriginalCommit    string   `json:"original_commit,omitempty"`
-	CompletedCommands int      `json:"completed_commands,omitempty"`
-	Finished          string   `json:"finished_at"`
-}
-
-// PlanChat is a saved conversation about how to reproduce a paper's
-// experiments; a reproduction plan can take it into account.
-type PlanChat struct {
-	Messages []ChatMessage `json:"messages"`
-	Grill    bool          `json:"grill"`
-	SavedAt  string        `json:"saved_at"`
-}
-type ChatMessage struct {
-	Role string `json:"role"` // "user" or "assistant"
-	Text string `json:"text"`
-	At   string `json:"at,omitempty"`
 }

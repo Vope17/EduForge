@@ -2,11 +2,11 @@ package providers
 
 import (
 	"context"
+	"eduforge/internal/domain"
 	"encoding/json"
 	"io"
 	"net/http"
 	"os"
-	"eduforge/internal/domain"
 	"path/filepath"
 	"strings"
 	"testing"

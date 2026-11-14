@@ -1,11 +1,7 @@
-// Research library helpers: folders (one level per project) and read state.
+// Library helpers: folders (one level per project).
 import { reactive } from 'vue'
 import type { Folder, Paper, Rec, Summary } from '../api/types.ts'
 import type { Workspace } from './workspace.ts'
-
-export function isRead(snapshot: Summary, paperID: string): boolean {
-  return (snapshot.reading || []).some(x => x.data.paper_id === paperID)
-}
 
 export function folderList(snapshot: Summary): Rec<Folder>[] {
   return (snapshot.folder || []).slice().sort((a, b) => a.data.name.localeCompare(b.data.name))

@@ -14,8 +14,6 @@ import (
 
 	"eduforge/internal/app"
 	"eduforge/internal/artifacts"
-	"eduforge/internal/domain"
-	"eduforge/internal/experiments"
 	"eduforge/internal/httpapi"
 	"eduforge/internal/mathtex"
 	"eduforge/internal/store"
@@ -29,7 +27,7 @@ func env(name, fallback string) string {
 }
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "Usage: eduforge serve | runner | healthcheck")
+		fmt.Fprintln(os.Stderr, "Usage: eduforge serve | healthcheck")
 		os.Exit(2)
 	}
 	switch os.Args[1] {
@@ -38,20 +36,6 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-	case "runner":
-		flags := flag.NewFlagSet("runner", flag.ExitOnError)
-		spec := flags.String("spec", "", "Confirmed experiment specification")
-		_ = flags.Parse(os.Args[2:])
-		os.Exit(experiments.Execute(*spec))
-	case "runner-status":
-		flags := flag.NewFlagSet("runner-status", flag.ExitOnError)
-		dir := flags.String("dir", "", "Experiment run directory")
-		_ = flags.Parse(os.Args[2:])
-		status, err := experiments.Inspect(*dir)
-		if err != nil {
-			os.Exit(1)
-		}
-		fmt.Println(string(domain.Encode(status)))
 	case "healthcheck":
 		flags := flag.NewFlagSet("healthcheck", flag.ExitOnError)
 		url := flags.String("url", "http://127.0.0.1:8080/api/health", "Health endpoint")

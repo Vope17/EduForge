@@ -25,12 +25,12 @@ ARG CODEX_VERSION=0.167.1
 ARG CLAUDE_CODE_VERSION=2.1.290
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates poppler-utils libreoffice-impress libreoffice-writer \
-    fonts-noto-cjk git openssh-client tini librsvg2-bin \
+    fonts-noto-cjk tini librsvg2-bin \
     && rm -rf /var/lib/apt/lists/* \
     && npm install -g @openai/codex@${CODEX_VERSION} @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
     && npm cache clean --force \
     && useradd --create-home --uid 10001 eduforge \
-    && mkdir -p /data /secrets/codex /secrets/claude /secrets/keys /secrets/ssh /workspace \
+    && mkdir -p /data /secrets/codex /secrets/claude /secrets/keys /workspace \
     && chown -R eduforge:eduforge /data /secrets /workspace
 COPY --from=backend /out/eduforge /usr/local/bin/eduforge
 COPY --from=web /src/frontend/dist /app/web

@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
-	"os"
-	"path/filepath"
 	"sort"
-	"strings"
 
 	"eduforge/internal/artifacts"
 	"eduforge/internal/domain"
@@ -88,22 +85,12 @@ func (a *App) ProviderRefs(ctx context.Context, owner string) ([]domain.Provider
 	})
 	return out, nil
 }
-func (a *App) ManualReading(ctx context.Context, owner string, h domain.Reading) (domain.Record, error) {
-	if strings.TrimSpace(h.Title) == "" {
-		return domain.Record{}, errors.New("paper_title_required")
-	}
-	if h.PaperID != "" {
-		return a.MarkRead(ctx, owner, h.PaperID, true)
-	}
-	h.CompletedAt = domain.Now()
-	return a.create(ctx, owner, "reading", "", "", "", h)
-}
 func (a *App) ReapplyTemplate(ctx context.Context, owner, id, templateID string) (domain.Record, error) {
 	old, art, err := get[domain.Artifact](ctx, a, owner, id, "artifact")
 	if err != nil {
 		return old, err
 	}
-	if art.Type != "A" && art.Type != "B" && art.Type != "C" {
+	if art.Type != "A" && art.Type != "B" {
 		return old, errors.New("template_not_supported")
 	}
 	if art.Style.Resolved == nil {
@@ -150,39 +137,4 @@ func (a *App) ReapplyTemplate(ctx context.Context, owner, id, templateID string)
 	}
 	art.Check = research.Validate(art, k)
 	return a.Store.Create(ctx, domain.Record{Owner: owner, Kind: "artifact", Parent: old.Parent, Project: old.Project, Paper: old.Paper, Version: old.Version + 1, Data: domain.Encode(art)})
-}
-func (a *App) SaveSSH(ctx context.Context, owner, config, known, key string) error {
-	if err := store.ValidateID(owner); err != nil {
-		return err
-	}
-	if len(config) > 64<<10 || len(known) > 1<<20 || len(key) > 64<<10 {
-		return errors.New("connection_config_too_large")
-	}
-	dir := filepath.Join(a.Secrets, "ssh", owner)
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return err
-	}
-	if key != "" {
-		if err := store.Atomic(filepath.Join(dir, "identity"), []byte(key), 0600); err != nil {
-			return err
-		}
-	}
-	if config != "" {
-		lower := strings.ToLower(config)
-		for _, directive := range []string{"proxycommand", "localcommand", "permitlocalcommand", "match exec", "include ", "identityfile"} {
-			if strings.Contains(lower, directive) {
-				return errors.New("ssh_config_use_managed_identity_and_no_local_commands")
-			}
-		}
-		config = "Host *\n  IdentitiesOnly yes\n  IdentityFile " + filepath.Join(dir, "identity") + "\n\n" + config
-		if err := store.Atomic(filepath.Join(dir, "config"), []byte(config), 0600); err != nil {
-			return err
-		}
-	}
-	if known != "" {
-		if err := store.Atomic(filepath.Join(dir, "known_hosts"), []byte(known), 0600); err != nil {
-			return err
-		}
-	}
-	return nil
 }

@@ -43,16 +43,11 @@ export interface OutputSettings {
   audience: string
   minutes: number
   template_id: string
-  /**
-   * PlanChatID is a saved planning conversation a reproduction plan (C)
-   * takes into account.
-   */
-  plan_chat_id?: string
   /** ReaderTemplateID is an imported Word template for readers (A). */
   reader_template_id?: string
   /**
    * Instructions are the user's own wishes for each kind of output
-   * ("A", "B", "C"), passed to the model as written.
+   * ("A", "B"), passed to the model as written.
    */
   instructions?: Record<string, string>
 }
@@ -220,7 +215,6 @@ export interface Request {
   paper_ids: string[] | null
   use_paper_settings?: boolean
   targets?: GenerationTarget[]
-  combined: boolean
   selected: string[] | null
   languages: Record<string, string> | null
   ui_language: string
@@ -518,116 +512,6 @@ export interface TemplateVersion {
   version: number
   saved_at: string
   template: unknown
-}
-
-export interface Reading {
-  title: string
-  paper_id: string
-  terms: string[] | null
-  completed_at: string
-}
-
-export interface Host {
-  mode: string
-  ssh_alias: string
-  workdir: string
-  os: string
-  cpu: string
-  gpu: string
-  memory_gb: number
-  environment: string
-  environment_name: string
-  allowed_root: string
-  concurrency: number
-}
-
-export interface Estimate {
-  phase: string
-  machine: string
-  human: string
-  basis: string
-  confidence: string
-}
-
-export interface Plan {
-  target: string
-  citation: string
-  repo: string
-  commit: string
-  host: Host
-  commands: string[][] | null
-  resume_commands?: string[][]
-  data: string
-  weights: string
-  dependencies: string
-  downloads: string
-  output_csv: string
-  metric: string
-  expected: number | null
-  tolerance: number
-  conditions: Conditions
-  estimates: Estimate[] | null
-  missing: string[] | null
-  compatibility: Issue[] | null
-  confirmed: boolean
-  confirmed_hash: string
-  previous_id?: string
-}
-
-export interface Run {
-  plan_id: string
-  plan_hash: string
-  run_id: string
-  host: Host
-  status: string
-  progress: string
-  comparison: string
-  reason: string
-  evidence: string[] | null
-  git_commit: string
-  branch: string
-  actual: number | null
-  started_at: string
-  dispatched_at?: string
-  original_commit?: string
-  completed_commands?: number
-  finished_at: string
-}
-
-/**
- * PlanChat is a saved conversation about how to reproduce a paper's
- * experiments; a reproduction plan can take it into account.
- */
-export interface PlanChat {
-  messages: ChatMessage[] | null
-  grill: boolean
-  saved_at: string
-}
-
-export interface ChatMessage {
-  /** "user" or "assistant" */
-  role: string
-  text: string
-  at?: string
-}
-
-export interface Difference {
-  field: string
-  a: string
-  b: string
-  reason: string
-}
-
-export interface Pair {
-  a: string
-  b: string
-  related: boolean
-  similarity: number
-  basis: string[] | null
-  numeric_comparable: boolean
-  differences: Difference[] | null
-  incomplete: boolean
-  citations: string[] | null
 }
 
 /** EditBlock is one selected piece of an output. */

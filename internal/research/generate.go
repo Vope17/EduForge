@@ -37,8 +37,6 @@ func BudgetFor(kind, depth string) Budget {
 	switch kind {
 	case "B":
 		return Budget{Passages: 14, PassageRunes: 3000, Pages: 5}
-	case "C":
-		return Budget{Passages: 12, PassageRunes: 2500, Pages: 3}
 	}
 	switch depth {
 	case "brief":
@@ -99,7 +97,7 @@ type Request struct {
 	// Index is the section (0–6), or -1 for a reproduction plan chapter.
 	Index    int
 	Lang     string
-	Kind     string // "A", "B" or "C"
+	Kind     string // "A" or "B"
 	Settings domain.OutputSettings
 	Style    domain.Style
 	Known    []string

@@ -3,11 +3,11 @@ import { reactive } from 'vue'
 // Hash routes:
 //   #/                                 → first project home
 //   #/p/:project                       → project home
-//   #/p/:project/paper/:paper/:step    → paper workspace (step: sources|knowledge|outputs|experiment)
+//   #/p/:project/paper/:paper/:step    → paper workspace (step: sources|knowledge|outputs)
 //   #/p/:project/batch                 → batch generation for selected papers
 //   #/settings/:tab                    → settings
-export const STEPS = ['sources', 'knowledge', 'outputs', 'experiment'] as const
-export const SETTINGS_TABS = ['providers', 'templates', 'reading', 'ssh'] as const
+export const STEPS = ['sources', 'knowledge', 'outputs'] as const
+export const SETTINGS_TABS = ['providers', 'templates'] as const
 export type Step = typeof STEPS[number]
 export type SettingsTab = typeof SETTINGS_TABS[number]
 

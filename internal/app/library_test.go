@@ -18,7 +18,7 @@ func count(t *testing.T, a *App, owner string, f store.Filter) int {
 	return len(items)
 }
 
-func TestDeletePaperRemovesItsRecordsAndReading(t *testing.T) {
+func TestDeletePaperRemovesItsRecords(t *testing.T) {
 	ctx := context.Background()
 	a, owner, project, paper := fixture(t)
 	other, err := a.CreatePaper(ctx, owner, project.ID, domain.Paper{Title: "Kept study"})
@@ -30,14 +30,6 @@ func TestDeletePaperRemovesItsRecordsAndReading(t *testing.T) {
 	}
 	if _, err = a.create(ctx, owner, "artifact", paper.ID, project.ID, paper.ID, domain.Artifact{Type: "A", Language: "en"}); err != nil {
 		t.Fatal(err)
-	}
-	if _, err = a.SavePlanChat(ctx, owner, paper.ID, domain.PlanChat{Messages: []domain.ChatMessage{{Role: "user", Text: "hi"}}}); err != nil {
-		t.Fatal(err)
-	}
-	for _, id := range []string{paper.ID, other.ID} {
-		if _, err = a.MarkRead(ctx, owner, id, true); err != nil {
-			t.Fatal(err)
-		}
 	}
 	task, err := a.create(ctx, owner, "task", paper.ID, project.ID, paper.ID, domain.Task{Type: "A", Status: "running"})
 	if err != nil {
@@ -55,17 +47,10 @@ func TestDeletePaperRemovesItsRecordsAndReading(t *testing.T) {
 	if _, err = a.Store.Get(ctx, owner, paper.ID, "paper"); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatal("paper should be gone")
 	}
-	for _, kind := range []string{"source", "knowledge", "artifact", "plan_chat", "task"} {
+	for _, kind := range []string{"source", "knowledge", "artifact", "task"} {
 		if n := count(t, a, owner, store.Filter{Kind: kind, Paper: paper.ID}); n != 0 {
 			t.Fatalf("%d %s records survived", n, kind)
 		}
-	}
-	readings, _ := a.Store.List(ctx, owner, store.Filter{Kind: "reading"})
-	if len(readings) != 1 {
-		t.Fatalf("only the other study's reading entry should remain, found %d", len(readings))
-	}
-	if r, _ := domain.Decode[domain.Reading](readings[0].Data); r.PaperID != other.ID {
-		t.Fatal("the wrong reading entry was removed")
 	}
 	if _, err = a.Store.Get(ctx, owner, other.ID, "paper"); err != nil {
 		t.Fatal("another study was affected")

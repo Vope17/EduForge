@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, reactive, watch, onMounted, onUnmounted } from 'vue'
 import { useWorkspace } from '../lib/workspace.ts'
 import { move } from '../lib/i18n.ts'
 import type { LoginState, ModelOption, Provider, Rec } from '../api/types.ts'
@@ -9,7 +9,6 @@ const sub = computed(() => props.section)
 // Per provider id: the editable copy, an entered key, its models, sign-in state, last error, loading.
 const form = reactive<Record<string, Provider>>({}), keys = reactive<Record<string, string>>({}), models = reactive<Record<string, ModelOption[]>>({})
 const login = reactive<Record<string, LoginState>>({}), connectionErrors = reactive<Record<string, string>>({}), loading = reactive<Record<string, boolean>>({})
-const sshConfig = ref(''), sshKnown = ref(''), sshKey = ref('')
 // Model providers are ordered by the user; the offline test mode sits apart.
 const modelProviders = computed(() => providers.value.filter(p => p.data.kind !== 'source-extract'))
 const offlineProviders = computed(() => providers.value.filter(p => p.data.kind === 'source-extract'))
@@ -71,10 +70,6 @@ async function reorder(index: number, offset: number) {
   await act(() => api('/providers/order', { method: 'PUT', body: { ids } }))
   void checkConnections()
 }
-async function saveSSH() {
-  const result = await act(() => api('/connections/ssh', { method: 'PUT', body: { config: sshConfig.value, known_hosts: sshKnown.value, private_key: sshKey.value } }))
-  if (result) { sshConfig.value = ''; sshKnown.value = ''; sshKey.value = '' }
-}
 </script>
 
 <template>
@@ -129,6 +124,5 @@ async function saveSSH() {
         </form>
       </details>
     </section>
-    <section v-show="sub === 'ssh'" class="panel subpage"><div class="section-heading"><h2>{{ t('ssh') }}</h2></div><p class="caption">{{ t('sshHint') }}</p><form @submit.prevent="saveSSH"><label>SSH config<textarea v-model="sshConfig" rows="5" spellcheck="false" placeholder="Host lab&#10;  HostName …&#10;  User …"></textarea></label><label>known_hosts<textarea v-model="sshKnown" rows="3" spellcheck="false"></textarea></label><label>{{ t('sshPrivateKey') }}<textarea v-model="sshKey" rows="3" spellcheck="false" autocomplete="off"></textarea></label><button class="secondary" :disabled="!!state.busy">{{ t('save') }}</button></form></section>
   </div>
 </template>

@@ -16,8 +16,8 @@ import (
 	"strings"
 	"sync"
 
-	_ "modernc.org/sqlite"
 	"eduforge/internal/domain"
+	_ "modernc.org/sqlite"
 )
 
 //go:embed schema.sql

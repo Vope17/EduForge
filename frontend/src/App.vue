@@ -14,8 +14,7 @@ const { state, route, go, t, init, refresh, explain } = createWorkspace()
 const ready = ref(false)
 
 // Poll quickly only while something is running; otherwise stay quiet.
-const busyRemote = computed(() => activeTasks(state.snapshot).length > 0 ||
-  (state.snapshot.run || []).some(r => !['finished', 'manual', 'needs_environment', 'cancelled', 'failed'].includes(r.data.progress)))
+const busyRemote = computed(() => activeTasks(state.snapshot).length > 0)
 let timer: ReturnType<typeof setTimeout> | undefined
 function schedule() {
   clearTimeout(timer)

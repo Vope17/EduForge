@@ -16,7 +16,7 @@ func TestResolvePriorityAndExplicitClear(t *testing.T) {
 }
 func TestStyleCannotChangeFactsOrLanguage(t *testing.T) {
 	for _, key := range []string{"language", "commands", "expected", "metric", "knowledge_id"} {
-		if _, err := Resolve("C", nil, nil, nil, domain.Style{key: "changed"}); err == nil {
+		if _, err := Resolve("A", nil, nil, nil, domain.Style{key: "changed"}); err == nil {
 			t.Fatalf("accepted forbidden style field %s", key)
 		}
 	}

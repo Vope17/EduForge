@@ -81,11 +81,6 @@ func BlobReferences(r domain.Record) map[string]bool {
 				add(f)
 			}
 		}
-	case "run":
-		value, _ := domain.Decode[domain.Run](r.Data)
-		for _, file := range value.Evidence {
-			add(file)
-		}
 	case "artifact", "preview":
 		value, _ := domain.Decode[domain.Artifact](r.Data)
 		for _, section := range value.Sections {

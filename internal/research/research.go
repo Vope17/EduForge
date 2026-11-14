@@ -3,7 +3,6 @@ package research
 
 import (
 	"regexp"
-	"sort"
 	"strings"
 	"unicode"
 
@@ -170,98 +169,6 @@ func PresentationMinutes(sections []domain.Section) float64 {
 	return float64(words)/130 + float64(han)/260
 }
 
-type Difference struct {
-	Field  string `json:"field"`
-	A      string `json:"a"`
-	B      string `json:"b"`
-	Reason string `json:"reason"`
-}
-type Pair struct {
-	A           string       `json:"a"`
-	B           string       `json:"b"`
-	Related     bool         `json:"related"`
-	Similarity  float64      `json:"similarity"`
-	Basis       []string     `json:"basis"`
-	Numeric     bool         `json:"numeric_comparable"`
-	Differences []Difference `json:"differences"`
-	Incomplete  bool         `json:"incomplete"`
-	Citations   []string     `json:"citations"`
-}
-
-func Compare(a, b domain.Conditions) []Difference {
-	out := []Difference{}
-	rows := [][3]string{{"task", a.Task, b.Task}, {"dataset", a.Dataset, b.Dataset}, {"split", a.Split, b.Split}, {"metric", a.Metric, b.Metric}, {"evaluation", a.Evaluation, b.Evaluation}}
-	for _, r := range rows {
-		reason := ""
-		if r[1] == "" || r[2] == "" {
-			reason = "missing"
-		} else if !strings.EqualFold(strings.TrimSpace(r[1]), strings.TrimSpace(r[2])) {
-			reason = "different"
-		}
-		if reason != "" {
-			out = append(out, Difference{r[0], r[1], r[2], reason})
-		}
-	}
-	return out
-}
-
-var wordPattern = regexp.MustCompile(`[A-Za-z][A-Za-z0-9_-]{2,}|[\p{Han}]{2,4}`)
-var stops = map[string]bool{"the": true, "and": true, "for": true, "with": true, "from": true, "this": true, "that": true, "are": true, "was": true, "using": true, "paper": true, "our": true, "results": true, "method": true}
-
-func wordSet(text string) map[string]bool {
-	out := map[string]bool{}
-	for _, w := range wordPattern.FindAllString(strings.ToLower(text), -1) {
-		if !stops[w] {
-			out[w] = true
-		}
-	}
-	return out
-}
-func Suggest(ids []string, knowledge map[string]domain.Knowledge) []Pair {
-	out := []Pair{}
-	for i, id := range ids {
-		a := knowledge[id]
-		for _, other := range ids[i+1:] {
-			b := knowledge[other]
-			textA, textB := a.Title, b.Title
-			for _, u := range a.Units {
-				textA += " " + Clip(u.Text, 1200)
-			}
-			for _, u := range b.Units {
-				textB += " " + Clip(u.Text, 1200)
-			}
-			sa, sb := wordSet(textA), wordSet(textB)
-			common := []string{}
-			for w := range sa {
-				if sb[w] {
-					common = append(common, w)
-				}
-			}
-			sort.Strings(common)
-			similarity := float64(len(common)) / float64(max(1, len(sa)+len(sb)-len(common)))
-			diff := Compare(a.Conditions, b.Conditions)
-			cites := []string{}
-			incomplete := false
-			for _, k := range []domain.Knowledge{a, b} {
-				incomplete = incomplete || len(k.Units) == 0
-				for _, issue := range k.Issues {
-					incomplete = incomplete || issue.Code == "source_missing"
-				}
-				before := len(cites)
-				for _, claim := range k.Claims {
-					if claim.Section == 4 && claim.Verified && len(numberSet(claim.Text)) > 0 {
-						cites = append(cites, claim.Citations...)
-					}
-				}
-				if len(cites) == before && len(k.Units) > 0 {
-					cites = append(cites, k.Units[0].ID)
-				}
-			}
-			out = append(out, Pair{A: id, B: other, Related: similarity >= 0.13, Similarity: similarity, Basis: common[:min(20, len(common))], Numeric: len(diff) == 0 && !incomplete, Differences: diff, Incomplete: incomplete, Citations: cites})
-		}
-	}
-	return out
-}
 func Excerpt(k domain.Knowledge, section int, depth string, lang string) domain.Section {
 	limit := 2400
 	switch depth {

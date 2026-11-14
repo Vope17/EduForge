@@ -2,21 +2,20 @@
 import { computed, ref } from 'vue'
 import { useWorkspace } from '../../lib/workspace.ts'
 import { paperSteps, nextStep } from '../../lib/status.ts'
-import { isRead, folderList, groupPapers, libraryActions } from '../../lib/library.ts'
+import { folderList, groupPapers, libraryActions } from '../../lib/library.ts'
 import Icon from '../Icon.vue'
 import StepDots from '../paper/StepDots.vue'
 import NewPaperDialog from '../dialogs/NewPaperDialog.vue'
 import NewProjectDialog from '../dialogs/NewProjectDialog.vue'
-import type { Pair, Paper, Rec } from '../../api/types.ts'
+import type { Paper, Rec } from '../../api/types.ts'
 
 const workspace = useWorkspace()
-const { state, t, api, act, go, openPaper } = workspace
+const { state, t, go, openPaper } = workspace
 const { createFolder, movePaper, deleteProject } = libraryActions(workspace)
 const folders = computed(() => folderList(state.snapshot))
 const groups = computed(() => groupPapers(papers.value, folders.value).filter(g => g.folder || g.papers.length))
 const addingPaper = ref(false), addingProject = ref(false), personal = ref(false)
 const papers = computed(() => state.snapshot.paper || [])
-const pairs = computed(() => state.snapshot.pairs || [])
 const anyParsed = computed(() => papers.value.some(p => p.data.knowledge_id))
 const onboarding = computed(() => [
   { key: 'connect', done: state.connection.mode === 'model', label: t('onboardConnect'), action: () => go({ name: 'settings', tab: 'providers' }) },
@@ -25,12 +24,7 @@ const onboarding = computed(() => [
   { key: 'parse', done: anyParsed.value, label: t('onboardParse'), action: () => papers.value[0] && openPaper(papers.value[0].id, 'sources') },
 ])
 const showOnboarding = computed(() => onboarding.value.some(step => !step.done))
-function title(id: string) { return papers.value.find(x => x.id === id)?.data.title || id }
-function read(paper: Rec<Paper>) { return isRead(state.snapshot, paper.id) }
 function openNext(paper: Rec<Paper>) { openPaper(paper.id, nextStep(paperSteps(paper, state.snapshot))) }
-async function togglePair(pair: Pair) {
-  await act(() => api(`/projects/${state.projectID}/comparisons`, { method: 'POST', body: { ...pair, related: !pair.related } }))
-}
 </script>
 
 <template>
@@ -66,7 +60,6 @@ async function togglePair(pair: Pair) {
           <article v-for="paper in group.papers" :key="paper.id" class="paper-card">
             <div class="paper-card-top">
               <label class="check"><input v-model="state.selected" type="checkbox" :value="paper.id" :aria-label="t('selectForBatch') + ' · ' + paper.data.title"></label>
-              <span v-if="read(paper)" class="pill success">✓ {{ t('readDone') }}</span>
             </div>
             <h2><button class="paper-title" @click="openNext(paper)">{{ paper.data.title }}</button></h2>
             <StepDots :paper="paper" labelled />
@@ -85,21 +78,6 @@ async function togglePair(pair: Pair) {
         <h2>{{ t('addPaper') }}</h2>
         <p>{{ t('libraryIntro') }}</p>
       </div>
-
-      <section v-if="pairs.length" class="panel">
-        <div class="section-heading"><h2>{{ t('comparisons') }}</h2></div>
-        <div v-for="pair in pairs" :key="pair.a + pair.b" class="comparison-row">
-          <div>
-            <strong>{{ title(pair.a) }} ↔ {{ title(pair.b) }}</strong>
-            <p class="muted">{{ (pair.basis || []).join(' · ') }}</p>
-            <p v-if="pair.related" class="caption">{{ t(pair.incomplete ? 'incomplete' : pair.numeric_comparable ? 'numericComparable' : 'conceptsOnly') }}</p>
-            <div v-if="pair.related && pair.differences?.length" class="citation-list">
-              <span v-for="diff in pair.differences" :key="diff.field" class="pill">{{ t(diff.field) }}: {{ diff.a || '?' }} / {{ diff.b || '?' }}</span>
-            </div>
-          </div>
-          <label class="check"><input type="checkbox" :checked="pair.related" @change="togglePair(pair)">{{ t('related') }}</label>
-        </div>
-      </section>
 
       <footer class="project-footer">
         <label class="check"><input v-model="personal" type="checkbox">{{ t('includePersonal') }}</label>

@@ -9,13 +9,13 @@ const props = defineProps<{ paperIds: string[] }>()
 const emit = defineEmits<{ started: [requestID: string] }>()
 const { state, t, api, act, explain } = useWorkspace()
 const form = reactive({
-  selected: ['A'], combined: false, use_paper_settings: false, languages: { A: '', B: '', C: '' }, profile_id: '',
+  selected: ['A'], use_paper_settings: false, languages: { A: '', B: '' }, profile_id: '',
   settings: { depth: 'standard', level: 'intermediate', audience: 'classmates', minutes: 10, template_id: '', reader_template_id: '', languages: {} as Record<string, string>, instructions: { A: '', B: '' } as Record<string, string> },
-  overrides: { A: {}, B: {}, C: {} },
+  overrides: { A: {}, B: {} },
 })
 const papers = computed(() => (state.snapshot.paper || []).filter(p => props.paperIds.includes(p.id)))
 const single = computed(() => papers.value.length === 1 ? papers.value[0] : null)
-const savedKinds = computed(() => ['A', 'B', 'C'].filter(kind => papers.value.some(p => p.data.settings?.selected?.includes(kind))))
+const savedKinds = computed(() => ['A', 'B'].filter(kind => papers.value.some(p => p.data.settings?.selected?.includes(kind))))
 const activeKinds = computed(() => form.use_paper_settings ? savedKinds.value : form.selected)
 const unconfirmed = computed(() => papers.value.filter(p => !(state.snapshot.knowledge || []).find(k => k.id === p.data.knowledge_id)?.data.confirmed))
 const has = (kind: string) => !form.use_paper_settings && form.selected.includes(kind)
@@ -25,7 +25,7 @@ watch(single, paper => {
   const saved = paper?.data.settings
   if (!saved?.selected?.length) return
   form.selected = [...saved.selected]
-  Object.assign(form.languages, { A: '', B: '', C: '' }, saved.languages || {})
+  Object.assign(form.languages, { A: '', B: '' }, saved.languages || {})
   for (const key of ['depth', 'level', 'audience', 'minutes', 'template_id', 'reader_template_id'] as const) if (saved[key]) Object.assign(form.settings, { [key]: saved[key] })
   Object.assign(form.settings.instructions, { A: '', B: '' }, saved.instructions || {})
 }, { immediate: true })
@@ -38,7 +38,6 @@ async function generate() {
       method: 'POST',
       body: {
         ...form,
-        combined: !form.use_paper_settings && form.combined && props.paperIds.length > 1,
         paper_ids: props.paperIds,
         ui_language: state.language,
       },
@@ -108,10 +107,6 @@ async function saveStudySettings() {
       <span class="field-label">{{ t('template') }}</span>
       <TemplatePicker v-model="form.settings.template_id" />
     </div>
-
-    <label v-if="!form.use_paper_settings && papers.length > 1" class="check">
-      <input v-model="form.combined" type="checkbox">{{ t('combinedOutput') }}
-    </label>
 
     <div class="form-actions">
       <p class="caption">{{ t('generateHint') }}</p>

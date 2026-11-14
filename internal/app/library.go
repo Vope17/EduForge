@@ -26,28 +26,6 @@ func (a *App) DeletePaper(ctx context.Context, owner, id string) error {
 			return errors.New("cancel_active_tasks_before_delete")
 		}
 	}
-	runs, err := a.Store.List(ctx, owner, store.Filter{Kind: "run", Paper: id})
-	if err != nil {
-		return err
-	}
-	for _, r := range runs {
-		run, _ := domain.Decode[domain.Run](r.Data)
-		if run.Progress != "finished" && run.Progress != "manual" && run.Progress != "needs_environment" {
-			return errors.New("active_experiment_prevents_delete")
-		}
-	}
-	readings, err := a.Store.List(ctx, owner, store.Filter{Kind: "reading"})
-	if err != nil {
-		return err
-	}
-	for _, r := range readings {
-		v, _ := domain.Decode[domain.Reading](r.Data)
-		if v.PaperID == id {
-			if err = a.Store.Delete(ctx, owner, r.ID); err != nil && !errors.Is(err, domain.ErrNotFound) {
-				return err
-			}
-		}
-	}
 	return a.Store.Delete(ctx, owner, id)
 }
 
