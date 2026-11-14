@@ -75,6 +75,12 @@ export interface Unit {
   kind: string
   text: string
   preview?: string
+  /**
+   * Mode is "text" when the page has readable text, or "vision" when it has
+   * little or none (a scan, a picture-only slide) and must be read from its
+   * image. Empty on units parsed before modes existed.
+   */
+  mode?: string
 }
 
 export interface Image {

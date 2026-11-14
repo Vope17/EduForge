@@ -99,6 +99,10 @@ type Unit struct {
 	Kind        string `json:"kind"`
 	Text        string `json:"text"`
 	Preview     string `json:"preview,omitempty"`
+	// Mode is "text" when the page has readable text, or "vision" when it has
+	// little or none (a scan, a picture-only slide) and must be read from its
+	// image. Empty on units parsed before modes existed.
+	Mode string `json:"mode,omitempty"`
 }
 type Image struct {
 	Path     string `json:"path"`

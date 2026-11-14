@@ -210,14 +210,14 @@ func (a *App) Upload(ctx context.Context, owner, lessonID, name, role string, b 
 	if role != "research" {
 		return domain.Record{}, errors.New("invalid_source_role")
 	}
-	allowed := ext == ".pdf" || ext == ".pptx"
+	allowed := ext == ".pdf" || ext == ".pptx" || ext == ".docx"
 	if !allowed || len(b) == 0 || len(b) > 64<<20 {
 		return domain.Record{}, errors.New("unsupported_file_or_size")
 	}
 	if ext == ".pdf" && !strings.HasPrefix(string(b[:min(8, len(b))]), "%PDF-") {
 		return domain.Record{}, errors.New("invalid_pdf")
 	}
-	if ext == ".pptx" && (len(b) < 4 || string(b[:2]) != "PK") {
+	if (ext == ".pptx" || ext == ".docx") && (len(b) < 4 || string(b[:2]) != "PK") {
 		return domain.Record{}, errors.New("invalid_office_file")
 	}
 	rel, sum, err := a.Store.Blob(b, ext)

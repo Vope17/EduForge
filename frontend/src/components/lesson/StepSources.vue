@@ -48,7 +48,7 @@ async function parse() { await act(() => api(`/lessons/${state.lessonID}/parse`,
       <div class="dropzone-body">
         <p class="caption">{{ t('dropResearch') }}</p>
         <div class="button-row">
-          <label class="file-picker"><Icon name="plus" /> {{ t('selectFiles') }}<input type="file" multiple accept=".pdf,.pptx" @change="pick(($event.target as HTMLInputElement).files)"></label>
+          <label class="file-picker"><Icon name="plus" /> {{ t('selectFiles') }}<input type="file" multiple accept=".pdf,.pptx,.docx" @change="pick(($event.target as HTMLInputElement).files)"></label>
           <span v-if="files.length" class="muted">{{ files.map(x => x.name).join(', ') }}</span>
           <button class="primary small" :disabled="!files.length || !!state.busy">{{ t('importSources') }}</button>
         </div>

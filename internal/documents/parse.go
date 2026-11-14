@@ -14,10 +14,10 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
+	"eduforge/internal/docread"
 	"eduforge/internal/domain"
 	"eduforge/internal/store"
 )
@@ -79,13 +79,20 @@ func convert(ctx context.Context, input, outdir, target, ext string) (string, er
 // 2: figures cropped from captions; formula review limited to real equations.
 // 3: page text in reading order instead of -layout column interleaving.
 // 4: ligatures restored where fonts extract them as punctuation.
-const ParserVersion = 6
+// 7: pages come from docread (PDF, PPTX, DOCX), with a mode per page.
+const ParserVersion = 7
+
+// pageImageEdge is the longest edge, in pixels, of the page images models read.
+const pageImageEdge = 1400
 
 // NeedsParse reports whether a source has no parse result from the current parser.
 func NeedsParse(src domain.Source) bool {
 	return src.Parsed == nil || src.Parsed.ParserVersion < ParserVersion
 }
 
+// Parse reads a source file into page units with page images. A page with
+// little text (a scan, a picture-only slide) is kept and marked "vision" so a
+// model reads its image; it is not rejected.
 func Parse(ctx context.Context, s *store.Store, r domain.Record) (domain.Parsed, error) {
 	src, err := domain.Decode[domain.Source](r.Data)
 	if err != nil {
@@ -98,92 +105,68 @@ func Parse(ctx context.Context, s *store.Store, r domain.Record) (domain.Parsed,
 	if err != nil {
 		return domain.Parsed{}, err
 	}
-	var p domain.Parsed
-	switch strings.ToLower(filepath.Ext(file)) {
-	case ".pdf":
-		p, err = parsePDF(ctx, s, file, r.ID)
-	case ".pptx":
-		p, err = parsePPTX(s, file, r.ID)
-	default:
-		err = errors.New("unsupported_research_file")
-	}
+	tmp, err := os.MkdirTemp("", "eduforge-parse-")
 	if err != nil {
-		return p, err
-	}
-	readable := false
-	for _, u := range p.Units {
-		if len(strings.TrimSpace(u.Text)) >= 30 {
-			readable = true
-		}
-	}
-	if !readable {
-		return p, errors.New("ocr_required")
-	}
-	p.ParserVersion = ParserVersion
-	return p, nil
-}
-
-func parsePDF(ctx context.Context, s *store.Store, file, id string) (domain.Parsed, error) {
-	p := domain.Parsed{Units: []domain.Unit{}, Images: []domain.Image{}, Issues: []domain.Issue{}}
-	// Reading order keeps two-column prose intact; -layout interleaves columns.
-	out, err := Command(ctx, "pdftotext", "-enc", "UTF-8", file, "-")
-	if err != nil {
-		return p, err
-	}
-	if len(out) > 32<<20 {
-		return p, errors.New("document_text_too_large")
-	}
-	pages := strings.Split(string(out), "\f")
-	if len(pages) > 0 && strings.TrimSpace(pages[len(pages)-1]) == "" {
-		pages = pages[:len(pages)-1]
-	}
-	if len(pages) > 300 {
-		return p, errors.New("document_exceeds_300_pages")
-	}
-	if info, err := Command(ctx, "pdfinfo", "-enc", "UTF-8", file); err == nil {
-		p.Title = pdfTitle(string(info))
-	}
-	tmp, err := os.MkdirTemp("", "eduforge-pdf-")
-	if err != nil {
-		return p, err
+		return domain.Parsed{}, err
 	}
 	defer os.RemoveAll(tmp)
-	for i, text := range pages {
-		select {
-		case <-ctx.Done():
-			return p, ctx.Err()
-		default:
+	doc, err := docread.Read(ctx, file, docread.Options{ImageDir: filepath.Join(tmp, "pages"), ImageEdge: pageImageEdge})
+	if err != nil {
+		return domain.Parsed{}, err
+	}
+	p := domain.Parsed{ParserVersion: ParserVersion, Title: doc.Title, Units: []domain.Unit{}, Images: []domain.Image{}, Issues: []domain.Issue{}}
+	label := map[string]string{docread.KindPage: "p", docread.KindSlide: "s"}
+	for _, page := range doc.Pages {
+		cite := fmt.Sprintf("%s:%s%d", r.ID, label[page.Kind], page.Index)
+		text := page.Text
+		if page.Kind == docread.KindPage {
+			text = JoinHyphenatedLines(RepairLigatures(text))
 		}
-		loc := i + 1
-		cite := fmt.Sprintf("%s:p%d", id, loc)
-		text = JoinHyphenatedLines(RepairLigatures(text))
-		u := domain.Unit{ID: cite, SourceID: id, Locator: loc, Kind: "page", Text: strings.TrimSpace(text)}
-		base := filepath.Join(tmp, fmt.Sprintf("page-%d", loc))
-		_, err = Command(ctx, "pdftoppm", "-f", strconv.Itoa(loc), "-l", strconv.Itoa(loc), "-scale-to", "1000", "-singlefile", "-png", file, base)
-		if err == nil {
-			b, e := os.ReadFile(base + ".png")
-			if e == nil {
-				u.Preview, _, err = s.Blob(b, ".png")
+		if page.Notes != "" {
+			text = strings.TrimSpace(text + "\n\nNotes:\n" + page.Notes)
+		}
+		u := domain.Unit{ID: cite, SourceID: r.ID, Locator: page.Index, Kind: page.Kind, Text: text, Mode: page.Mode}
+		if page.Image != "" {
+			if b, e := os.ReadFile(page.Image); e == nil {
+				u.Preview, _, e = s.Blob(b, ".png")
+				if e != nil {
+					u.Preview = ""
+				}
 			}
 		}
-		if err != nil {
+		if u.Preview == "" {
 			p.Issues = append(p.Issues, domain.Issue{Code: "preview_failed", Citation: cite})
 		}
-		if len(strings.TrimSpace(text)) < 30 {
-			p.Issues = append(p.Issues, domain.Issue{Code: "ocr_required", Citation: cite})
-		}
-		if needsFormulaReview(text) {
+		if page.Mode == docread.ModeText && needsFormulaReview(text) {
 			p.Issues = append(p.Issues, domain.Issue{Code: "formula_review", Citation: cite})
 		}
 		p.Units = append(p.Units, u)
 	}
-	figures, err := extractFigures(ctx, s, file, id, tmp)
-	if err == nil && len(figures) == 0 {
-		figures, err = embeddedImages(ctx, s, file, id, tmp)
+	for _, issue := range doc.Issues {
+		switch issue.Code {
+		case docread.IssueNoImage:
+			// Reported above as preview_failed for the page.
+		default:
+			p.Issues = append(p.Issues, domain.Issue{Code: issue.Code, Detail: issue.Detail})
+		}
 	}
-	p.Images = append(p.Images, figures...)
-	if err != nil {
-		p.Issues = append(p.Issues, domain.Issue{Code: "figure_review"})
+	switch doc.Format {
+	case "pdf":
+		figures, err := extractFigures(ctx, s, file, r.ID, tmp)
+		if err == nil && len(figures) == 0 {
+			figures, err = embeddedImages(ctx, s, file, r.ID, tmp)
+		}
+		p.Images = append(p.Images, figures...)
+		if err != nil {
+			p.Issues = append(p.Issues, domain.Issue{Code: "figure_review"})
+		}
+	case "pptx":
+		images, issues, err := pptxImages(s, file, r.ID)
+		if err != nil {
+			return p, err
+		}
+		p.Images = append(p.Images, images...)
+		p.Issues = append(p.Issues, issues...)
 	}
 	return p, nil
 }
@@ -286,67 +269,36 @@ func slideNames(a *Archive) ([]string, error) {
 	}
 	return out, nil
 }
-func textFromXML(b []byte) (string, error) {
-	dec := xml.NewDecoder(bytes.NewReader(b))
-	var out strings.Builder
-	for {
-		t, err := dec.Token()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return "", err
-		}
-		switch el := t.(type) {
-		case xml.StartElement:
-			if el.Name.Local == "t" {
-				var text string
-				if err := dec.DecodeElement(&text, &el); err != nil {
-					return "", err
-				}
-				out.WriteString(text)
-			}
-		case xml.EndElement:
-			if el.Name.Local == "p" {
-				out.WriteString("\n")
-			}
-		}
-	}
-	return strings.TrimSpace(out.String()), nil
-}
-func parsePPTX(s *store.Store, file, id string) (domain.Parsed, error) {
-	p := domain.Parsed{Units: []domain.Unit{}, Images: []domain.Image{}, Issues: []domain.Issue{}}
+
+// pptxImages collects the pictures embedded in a presentation's slides, with
+// the slide each came from. Slides are numbered as docread numbers them
+// (visible slides only), so a figure cites the same unit as its slide's text.
+func pptxImages(s *store.Store, file, id string) ([]domain.Image, []domain.Issue, error) {
 	a, err := OpenArchive(file)
 	if err != nil {
-		return p, err
+		return nil, nil, err
 	}
 	defer a.Close()
 	names, err := slideNames(a)
 	if err != nil {
-		return p, err
+		return nil, nil, err
 	}
-	for i, name := range names {
-		b, err := a.Read(name)
-		if err != nil {
-			return p, err
+	var images []domain.Image
+	var issues []domain.Issue
+	n := 0
+	for _, name := range names {
+		if b, e := a.Read(name); e == nil && hiddenSlide(b) {
+			continue
 		}
-		text, err := textFromXML(b)
-		if err != nil {
-			return p, err
-		}
-		cite := fmt.Sprintf("%s:s%d", id, i+1)
-		p.Units = append(p.Units, domain.Unit{ID: cite, SourceID: id, Locator: i + 1, Kind: "slide", Text: text})
-		if text == "" {
-			p.Issues = append(p.Issues, domain.Issue{Code: "unreadable_slide", Citation: cite})
-		}
-		relfile := path.Join(path.Dir(name), "_rels", path.Base(name)+".rels")
-		data, err := a.Read(relfile)
+		n++
+		cite := fmt.Sprintf("%s:s%d", id, n)
+		data, err := a.Read(path.Join(path.Dir(name), "_rels", path.Base(name)+".rels"))
 		if err != nil {
 			continue
 		}
 		rels, err := relations(data)
 		if err != nil {
-			return p, err
+			return nil, nil, err
 		}
 		keys := []string{}
 		for key := range rels {
@@ -356,7 +308,7 @@ func parsePPTX(s *store.Store, file, id string) (domain.Parsed, error) {
 		for _, key := range keys {
 			r := rels[key]
 			if strings.HasSuffix(r.Type, "/chart") {
-				p.Issues = append(p.Issues, domain.Issue{Code: "chart_formula_review", Citation: cite})
+				issues = append(issues, domain.Issue{Code: "chart_formula_review", Citation: cite})
 			}
 			if !strings.HasSuffix(r.Type, "/image") {
 				continue
@@ -364,7 +316,7 @@ func parsePPTX(s *store.Store, file, id string) (domain.Parsed, error) {
 			target := path.Clean(path.Join(path.Dir(name), r.Target))
 			ext := strings.ToLower(path.Ext(target))
 			if ext != ".png" && ext != ".jpg" && ext != ".jpeg" {
-				p.Issues = append(p.Issues, domain.Issue{Code: "figure_review", Citation: cite})
+				issues = append(issues, domain.Issue{Code: "figure_review", Citation: cite})
 				continue
 			}
 			img, err := a.Read(target)
@@ -373,10 +325,29 @@ func parsePPTX(s *store.Store, file, id string) (domain.Parsed, error) {
 			}
 			rel, _, err := s.Blob(img, ext)
 			if err != nil {
-				return p, err
+				return nil, nil, err
 			}
-			p.Images = append(p.Images, domain.Image{Path: rel, Citation: cite, Original: true})
+			images = append(images, domain.Image{Path: rel, Citation: cite, Original: true})
 		}
 	}
-	return p, nil
+	return images, issues, nil
+}
+
+// hiddenSlide reports whether a slide's root element has show="0".
+func hiddenSlide(slide []byte) bool {
+	dec := xml.NewDecoder(bytes.NewReader(slide))
+	for {
+		token, err := dec.Token()
+		if err != nil {
+			return false
+		}
+		if el, ok := token.(xml.StartElement); ok {
+			for _, attr := range el.Attr {
+				if attr.Name.Local == "show" && (attr.Value == "0" || attr.Value == "false") {
+					return true
+				}
+			}
+			return false
+		}
+	}
 }
