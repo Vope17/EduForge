@@ -15,13 +15,8 @@ import (
 // passages behind them (in page order) and images of those pages, so the
 // model reads equations, tables and figures as printed.
 
-// RelatedSection is no longer a special section (it was the paper's related
-// work); -1 matches none.
-const RelatedSection = -1
-
-// SectionOrder is the order sections appear in readers and decks. The
-// reader and deck writers are reworked for teaching output in the next phase;
-// until then they follow the knowledge sections in order.
+// SectionOrder is the order a deck's style preview and its fallback outline go
+// through the knowledge sections. (Handouts follow HandoutParts instead.)
 var SectionOrder = []int{0, 1, 2, 3, 4, 5, 6}
 
 // Budget sizes the evidence for one section and, for readers, its length.
@@ -49,17 +44,14 @@ func BudgetFor(kind, depth string) Budget {
 	return Budget{Passages: 12, PassageRunes: 3000, Pages: 4, BodyMin: 700, BodyMax: 1200}
 }
 
-// slideWeights share a talk's slides among the sections; the method and the
-// results take the most.
+// slideWeights share a class session's slides among the knowledge sections;
+// concepts, formulas and worked examples take the most.
 var slideWeights = map[int]float64{0: 1, 1: 0.6, 2: 2.2, 3: 1.6, 4: 1.6, 5: 0.6, 6: 0.6}
 
-// SlideCounts splits a talk of minutes into content slides per section,
-// about 1.1 slides a minute (figures may add slides of their own).
+// SlideCounts splits a class session of minutes into content slides per
+// section (see SlideTotal; figures may add slides of their own).
 func SlideCounts(minutes int) map[int]int {
-	if minutes <= 0 {
-		minutes = 10
-	}
-	total := math.Max(6, math.Min(60, math.Round(float64(minutes)*1.1)))
+	total := float64(SlideTotal(minutes))
 	sum := 0.0
 	for _, w := range slideWeights {
 		sum += w
@@ -97,9 +89,11 @@ type Request struct {
 	// they cite (see Excerpt).
 	Section domain.Section
 	// Index is the section (0–6), or -1 for a reproduction plan chapter.
-	Index    int
-	Lang     string
-	Kind     string // "A" or "B"
+	Index int
+	Lang  string
+	Kind  string // "A" or "B"
+	// PartKey is the handout part being written (see HandoutParts).
+	PartKey  string
 	Settings domain.OutputSettings
 	Style    domain.Style
 	Known    []string
@@ -161,14 +155,17 @@ func (r Request) Evidence() (passages []domain.Unit, pages []domain.Unit) {
 }
 
 var levelGuides = map[string]string{
-	"beginner":     "The reader is new to the field: explain the background and intuition first, define every technical term when it first appears, and walk through each equation slowly.",
-	"intermediate": "The reader knows the field's basics: explain the lesson's ideas and design choices clearly, define the lesson's own terms, and explain each equation's symbols and intuition.",
-	"advanced":     "The reader is an expert: focus on technical details, assumptions, design trade-offs and a critical reading, without basic background.",
+	"beginner":     "The students are new to the subject: start from intuition and everyday examples, define every technical term when it first appears, and walk through each formula slowly.",
+	"intermediate": "The students know the subject's basics: explain the lesson's ideas clearly, define the lesson's own terms, and explain each formula's symbols and meaning.",
+	"advanced":     "The students are advanced: focus on precise statements, assumptions, derivations and limits, without basic background.",
 }
-var audienceGuides = map[string]string{
-	"classmates": "The audience is classmates in a lesson-reading seminar: make the ideas easy to follow.",
-	"advisor":    "The audience is the presenter's advisor: be precise and technical, and point out assumptions and weaknesses.",
-	"crossField": "The audience comes from other fields: explain background and terms in plain language before the details.",
+
+// audienceLine states who the lesson is taught to, in the teacher's words.
+func audienceLine(settings domain.OutputSettings) string {
+	if a := strings.TrimSpace(settings.Audience); a != "" {
+		return fmt.Sprintf("The class: %s.", Clip(a, 200))
+	}
+	return ""
 }
 
 var figureCaptionLabel = regexp.MustCompile(`(?i)^\s*((?:fig(?:ure)?\.?|圖|table|表)\s*\d+)`)
@@ -226,48 +223,42 @@ func (r Request) Prompt(passages, pages []domain.Unit) string {
 	}
 	b.WriteString("Extracted text sometimes garbles names set in special fonts (for example RCACopilot coming out as RCAC followed by symbols such as !#$%): never copy garbled characters; use the name as printed on the page images or elsewhere in the passages, or leave it out.\n")
 
-	if r.Index >= 0 && r.Index < len(sectionBriefs) {
-		fmt.Fprintf(&b, "\nSection: %s — %s.\n", r.Section.Title, sectionBriefs[r.Index])
+	if p := PartIndex(r.PartKey); r.Kind == "A" && p >= 0 {
+		fmt.Fprintf(&b, "\nPart of the handout: %s — %s\n", r.Section.Title, partBriefs[r.PartKey])
 	} else {
 		fmt.Fprintf(&b, "\nSection: %s.\n", r.Section.Title)
 	}
 	if strings.TrimSpace(r.Section.Body) != "" {
-		fmt.Fprintf(&b, "Key points from the shared knowledge (cover all of them; they are the minimum, not the limit; add what the evidence says beyond them):\n%s\n", r.Section.Body)
+		fmt.Fprintf(&b, "Key points from the lesson's knowledge (cover all of them; they are the minimum, not the limit; add what the evidence says beyond them; a line starting with → is the point's solution, correction or symbols):\n%s\n", r.Section.Body)
 	}
-	switch r.Index {
-	case 2:
-		b.WriteString("Follow the order in which the lesson presents its method (the passages are in page order): the overview or architecture first, then every component or stage in turn with its inputs, outputs, how it works and its key equations. Do not skip components, and do not reorder them.\n")
-	case RelatedSection:
-		b.WriteString("Write about related work only as this lesson discusses it (its related work or background section and the baselines it compares against): group the prior approaches into categories, name the representative works the lesson cites, and explain how this lesson differs from each category and why. Do not compare with lessons outside these sources. If the sources say nothing about related work, say so in one sentence.\n")
-	case 4:
-		b.WriteString("Report the main results with their numbers exactly as written, what they are compared against and under which settings, and the ablations and analyses that explain them.\n")
-	}
-
 	switch r.Kind {
 	case "A":
-		budget := BudgetFor("A", r.Settings.Depth)
-		fmt.Fprintf(&b, "\nThis is one chapter of an illustrated reader that explains the lesson. Write connected explanatory prose: paragraphs of 3 to 6 sentences, grouped under 2 to 5 **subheadings**, with \"- \" bullets only for genuine lists (steps, datasets, baselines). Length: about %s in the body; do not stop short. ", span(budget.BodyMin, budget.BodyMax))
-		b.WriteString("Explain each equation: what it computes, what every symbol means and the intuition behind it. When a figure or table of the lesson shows the point, refer to it by its number as the lesson does (e.g. Figure 3) and say what it shows. ")
+		part := HandoutParts[max(0, PartIndex(r.PartKey))]
+		fmt.Fprintf(&b, "\nThis is one part of a handout students read before and after class. Write clear explanatory prose: paragraphs of 3 to 6 sentences, grouped under subheadings where it helps, with \"- \" bullets and \"1. \" numbered steps only for genuine lists. Length: about %s in the body; do not stop short. ", PartSpan(r.Settings.Depth, r.Lang, part))
+		b.WriteString("When a figure or table of the lesson shows the point, refer to it by its number as the material does (e.g. Figure 3) and say what it shows. ")
 		if guide := levelGuides[r.Settings.Level]; guide != "" {
-			b.WriteString(guide)
+			b.WriteString(guide + " ")
 		}
-		b.WriteString("\nReturn ONLY JSON: {\"title\": string, \"body\": string, \"citations\": [passage IDs]}. Keep the section's title, optionally with a short descriptive subtitle after a colon.\n")
+		if line := audienceLine(r.Settings); line != "" {
+			b.WriteString(line)
+		}
+		b.WriteString("\nReturn ONLY JSON: {\"title\": string, \"body\": string, \"citations\": [passage IDs]}. Keep the part's title as given.\n")
 	case "B":
 		n := max(1, r.Slides)
 		minutes := r.Settings.Minutes
 		if minutes <= 0 {
-			minutes = 10
+			minutes = 50
 		}
 		total := 0
 		for _, c := range SlideCounts(minutes) {
 			total += c
 		}
-		notes := int(math.Max(100, math.Min(450, float64(minutes)*260*0.8/float64(total+2))))
-		fmt.Fprintf(&b, "\nThis topic is part of a %d-minute talk. Write it as exactly %d %s, in the lesson's order, each covering a different part; the talk's length depends on it. ", minutes, n, map[bool]string{true: "slide", false: "slides"}[n == 1])
+		notes := notesLength(minutes, total)
+		fmt.Fprintf(&b, "\nThis topic is part of a %d-minute class session. Write it as exactly %d %s, in the lesson's order, each covering a different part; the session's length depends on it. ", minutes, n, map[bool]string{true: "slide", false: "slides"}[n == 1])
 		b.WriteString("Each slide has a specific title naming its content (not just the section name), at most 18 Chinese characters or 10 English words; a body of 3 to 5 \"- \" bullets, each at most 30 Chinese characters or 16 English words, with concrete content (names, numbers, equations in plain text) and no paragraphs or subheadings; and the passages it uses in citations — figures from a slide's cited pages are placed on that slide, so cite the page whose figure the slide discusses. ")
 		fmt.Fprintf(&b, "In notes write the presenter's speaker script for the slide: natural spoken sentences addressed to the audience, about %s, explaining the points and what the figure shows and ending with a short transition; no subheadings, bullets or labels. ", span(notes*4/5, notes*6/5))
-		if guide := audienceGuides[r.Settings.Audience]; guide != "" {
-			b.WriteString(guide)
+		if line := audienceLine(r.Settings); line != "" {
+			b.WriteString(line + " ")
 		}
 		if choices := r.figureChoices(passages); len(choices) > 0 {
 			b.WriteString("\nFigures and tables on these pages, which slides can show:\n- " + strings.Join(choices, "\n- ") + "\n")
@@ -282,7 +273,7 @@ func (r Request) Prompt(passages, pages []domain.Unit) string {
 		fmt.Fprintf(&b, "\nThe user's wishes for this output (follow them unless they conflict with the rules above or the evidence):\n%s\n", Clip(wish, 2000))
 	}
 	if len(r.Known) > 0 {
-		fmt.Fprintf(&b, "\nConcepts the reader already fully understands (do not explain them again): %s\n", domain.Encode(r.Known))
+		fmt.Fprintf(&b, "\nConcepts the students already learned in earlier lessons (do not explain them again; refer to them only where the material does): %s\n", domain.Encode(r.Known))
 	}
 	if len(r.Knowledge.Terms) > 0 {
 		type term struct {

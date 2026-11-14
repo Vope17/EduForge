@@ -105,6 +105,9 @@ func Extract(title string, sources []domain.Record) domain.Knowledge {
 	return k
 }
 
+// listMarkers matches the number that starts a numbered list line.
+var listMarkers = regexp.MustCompile(`(?m)^\s*\d+[.)]\s+`)
+
 var numberPattern = regexp.MustCompile(`[-+]?\b[0-9]+(?:\.[0-9]+)?(?:%|e[-+]?[0-9]+)?`)
 
 func numberSet(text string) map[string]bool {
@@ -134,8 +137,10 @@ func Validate(a domain.Artifact, k domain.Knowledge) domain.Check {
 			support.WriteByte('\n')
 		}
 		known := numberSet(support.String())
-		for n := range numberSet(sec.Title + "\n" + sec.Body + "\n" + sec.Notes) {
-			if !known[n] {
+		// Practice problems are new by design, so their numbers cannot come
+		// from the pages; list numbers ("1. …") are markers, not claims.
+		for n := range numberSet(listMarkers.ReplaceAllString(sec.Title+"\n"+sec.Body+"\n"+sec.Notes, "")) {
+			if !known[n] && sec.Part != "exercises" {
 				check.Issues = append(check.Issues, domain.Issue{Code: "unsupported_number", Detail: n, Index: i})
 			}
 		}
@@ -164,6 +169,20 @@ func Validate(a domain.Artifact, k domain.Knowledge) domain.Check {
 		check.Issues = append(check.Issues, domain.Issue{Code: "extractive_draft"})
 		if a.Language == "zh-TW" {
 			check.Issues = append(check.Issues, domain.Issue{Code: "translation_pending"})
+		}
+	}
+	if a.Type == "A" && a.Mode != "source-extract" {
+		have := map[string]bool{}
+		for i, sec := range a.Sections {
+			have[sec.Part] = true
+			if sec.Part == "exercises" && exercisesGiveAnswers(sec.Title+"\n"+sec.Body) {
+				check.Issues = append(check.Issues, domain.Issue{Code: "answer_in_exercises", Index: i})
+			}
+		}
+		for _, i := range HandoutPlan(k) {
+			if !have[HandoutParts[i].Key] {
+				check.Issues = append(check.Issues, domain.Issue{Code: "handout_part_missing", Detail: HandoutParts[i].Key})
+			}
 		}
 	}
 	if a.Type == "B" && a.Settings.Minutes > 0 && a.EstimatedMinutes > float64(a.Settings.Minutes) {

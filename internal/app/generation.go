@@ -252,14 +252,16 @@ func (a *App) StartRequest(ctx context.Context, owner, requestID, ui string, use
 		return nil, err
 	}
 	out := []domain.Record{}
-	known := []string{}
 	for _, target := range targets {
+		// What earlier lessons of the course taught is background, not new.
+		known := research.BackgroundConcepts(a.priorKnowledge(ctx, owner, target.LessonID))
 		for _, kind := range target.Settings.Selected {
 			total := len(research.SectionOrder)
-			t := domain.Task{RequestID: requestID, Type: kind, Status: "queued", Stage: "generate", Language: language(req, target, kind), KnowledgeID: target.KnowledgeID, Settings: target.Settings, Style: targetStyle(req, target, kind), Total: total}
 			if kind == "A" {
-				t.ReadTerms = known
+				total = len(research.HandoutParts)
 			}
+			t := domain.Task{RequestID: requestID, Type: kind, Status: "queued", Stage: "generate", Language: language(req, target, kind), KnowledgeID: target.KnowledgeID, Settings: target.Settings, Style: targetStyle(req, target, kind), Total: total}
+			t.ReadTerms = known
 			out = append(out, domain.Record{Course: r.Course, Lesson: target.LessonID, Data: domain.Encode(t)})
 		}
 	}
@@ -536,14 +538,14 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 			return err
 		}
 	} else {
-		// Readers and decks are written section by section in SectionOrder
-		// (related work only when the lesson discusses it). A style preview
-		// writes the first section only.
+		// A handout is written part by part (HandoutParts, the parts its
+		// knowledge can fill); a deck's style preview goes through the knowledge
+		// sections. A style preview writes the first one only.
 		order := []int{}
-		for _, i := range research.SectionOrder {
-			if i != research.RelatedSection || research.HasEvidence(k, i) {
-				order = append(order, i)
-			}
+		if kind == "A" {
+			order = research.HandoutPlan(k)
+		} else {
+			order = append(order, research.SectionOrder...)
 		}
 		if preview {
 			order = order[:1]
@@ -559,7 +561,13 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 				return nil
 			}
 			req := research.Request{Knowledge: k, Index: i, Lang: t.Language, Kind: kind, Settings: t.Settings, Style: t.Style.Resolved[kind], Known: t.ReadTerms, Slides: slides[i]}
-			req.Section = research.Excerpt(k, i, t.Settings.Depth, t.Language)
+			if kind == "A" {
+				part := research.HandoutParts[i]
+				req.Index, req.PartKey = -1, part.Key
+				req.Section = research.PartExcerpt(k, part, t.Settings.Depth, t.Language)
+			} else {
+				req.Section = research.Excerpt(k, i, t.Settings.Depth, t.Language)
+			}
 			passages, pages := req.Evidence()
 			prompt := req.Prompt(passages, pages)
 			images := []string{}
@@ -571,6 +579,10 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 			result, err := a.Providers.Generate(providers.WithImages(ctx, images), owner, t.RequestID, prompt, req.Section)
 			if err != nil {
 				return err
+			}
+			if kind == "A" {
+				// The part's heading and identity are fixed, whatever the model wrote.
+				result.Section.Title, result.Section.Part = req.Section.Title, req.PartKey
 			}
 			step := domain.Step{TaskID: id, Key: key, Content: result.Section, Provider: result.Provider, Model: result.Model, Language: t.Language, Cost: result.Cost, Mode: result.Mode}
 			if _, err = a.create(ctx, owner, "step", id, r.Course, r.Lesson, step); err != nil {
@@ -656,7 +668,7 @@ func (a *App) writeDeck(ctx context.Context, owner, id string, r domain.Record, 
 		if err != nil {
 			return nil, "", false, err
 		}
-		_, provider, err := a.Providers.Complete(ctx, owner, request.Providers, research.OutlinePrompt(k, t.Settings, t.Language), func(output string) error {
+		_, provider, err := a.Providers.Complete(ctx, owner, request.Providers, research.OutlinePrompt(k, t.Settings, t.Language, t.ReadTerms), func(output string) error {
 			parsed, err := research.ParseOutline(output, k)
 			if err == nil {
 				outline = parsed
@@ -685,7 +697,7 @@ func (a *App) writeDeck(ctx context.Context, owner, id string, r domain.Record, 
 	first := 0
 	for n, batch := range batches {
 		key := fmt.Sprintf("slides:%d", n)
-		req := research.SlidesRequest{Knowledge: k, Outline: outline, First: first, Count: len(batch), Lang: t.Language, Settings: t.Settings, Style: t.Style.Resolved["B"]}
+		req := research.SlidesRequest{Knowledge: k, Outline: outline, First: first, Count: len(batch), Lang: t.Language, Settings: t.Settings, Style: t.Style.Resolved["B"], Known: t.ReadTerms}
 		first += len(batch)
 		if _, ok := done[key]; ok {
 			continue

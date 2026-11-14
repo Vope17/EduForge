@@ -11,6 +11,7 @@ import (
 
 	"eduforge/internal/domain"
 	"eduforge/internal/providers"
+	"eduforge/internal/research"
 	"eduforge/internal/store"
 )
 
@@ -103,27 +104,27 @@ func TestOutputsAreWrittenFromThePagesAndTheUsersWishes(t *testing.T) {
 	}
 
 	reader := run("A", "deep")
-	if len(prompts) != 7 {
-		t.Fatalf("one prompt per knowledge section: %d", len(prompts))
+	if len(prompts) != len(research.HandoutParts) {
+		t.Fatalf("one prompt per handout part: %d", len(prompts))
 	}
 	for i, prompt := range prompts {
 		if !strings.Contains(prompt, "Explain every equation twice.") || strings.Contains(prompt, "Put the equations on the slides.") {
 			t.Fatal("each output follows its own wishes")
 		}
-		if !strings.Contains(prompt, "1600 to 2800 Chinese characters") || !strings.Contains(prompt, "new to the field") {
-			t.Fatalf("a deep reader asks for long chapters at the reader's level:\n%s", prompt)
+		if !strings.Contains(prompt, "Chinese characters") || !strings.Contains(prompt, "new to the subject") || !strings.Contains(prompt, "Part of the handout") {
+			t.Fatalf("a deep handout part is long and written at the students' level:\n%s", prompt)
 		}
 		if !strings.Contains(prompt, "Images attached to this message are the original pages "+cite) || len(images[i]) != 1 || !filepath.IsAbs(images[i][0]) {
 			t.Fatalf("the cited page goes with the prompt as an image: %v", images[i])
 		}
 	}
-	if !strings.Contains(prompts[2], "Do not skip components") {
-		t.Fatal("the method follows the lesson's order (core concepts come second, method third)")
-	}
-	for _, sec := range reader.Sections {
-		if strings.Contains(sec.Title, "相關研究比較") || strings.Contains(sec.Title, "Related research comparison") {
-			t.Fatal("no comparison with other studies in the library")
+	for i, part := range research.HandoutParts {
+		if reader.Sections[i].Part != part.Key || reader.Sections[i].Title != research.PartTitle(part.Key, "zh-TW") {
+			t.Fatalf("part %d should be %s: %+v", i, part.Key, reader.Sections[i])
 		}
+	}
+	if !strings.Contains(prompts[5], "NO answers") {
+		t.Fatalf("the practice problems are written without answers:\n%s", prompts[5])
 	}
 
 	deck := run("B", "")
@@ -131,7 +132,7 @@ func TestOutputsAreWrittenFromThePagesAndTheUsersWishes(t *testing.T) {
 		t.Fatalf("a deck is planned once, then written four slides at a time: %d calls", len(prompts))
 	}
 	plan := prompts[0]
-	for _, want := range []string{"Follow the lesson's own structure and order", "Plan exactly 14 content slides", "Put the equations on the slides.", "Figure 1 (page 1): Figure 1: one.", "[" + cite + "]"} {
+	for _, want := range []string{"Follow the order of the material", "Plan exactly 6 content slides", "Put the equations on the slides.", "Figure 1 (page 1): Figure 1: one.", "[" + cite + "]"} {
 		if !strings.Contains(plan, want) {
 			t.Fatalf("the plan prompt lacks %q:\n%s", want, plan)
 		}
@@ -163,4 +164,67 @@ func TestOutputsAreWrittenFromThePagesAndTheUsersWishes(t *testing.T) {
 			t.Fatal("slides are flattened into the deck")
 		}
 	}
+}
+
+// A later lesson treats what earlier lessons of the course taught as
+// background, in its handout and in its slides; the first lesson has none.
+func TestEarlierLessonsAreBackgroundInHandoutsAndSlides(t *testing.T) {
+	ctx := context.Background()
+	a, owner, course, first := fixture(t)
+	p, _ := domain.Decode[domain.Lesson](first.Data)
+	if _, err := set[domain.Knowledge](ctx, a, owner, p.KnowledgeID, 0, func(k *domain.Knowledge) error {
+		k.Terms = []domain.Term{{Original: "eigenvector", Citations: []string{k.Units[0].ID}}}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	second := newLesson(t, a, owner, course.ID, "Second lesson")
+	second = lessonWithPages(t, a, owner, second, 2)
+	sp, _ := domain.Decode[domain.Lesson](second.Data)
+	if _, err := set[domain.Knowledge](ctx, a, owner, sp.KnowledgeID, 0, func(k *domain.Knowledge) error {
+		k.Confirmed = true
+		k.Claims = []domain.Claim{{Section: 2, Text: "A concept", Citations: []string{k.Units[0].ID}, Verified: true, Kind: "ai_summary"}}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cite := lessonUnit(t, a, owner, second)
+	prompts := useFakeModel(t, a, owner, func(string) string {
+		return `{"title":"T","body":"B","citations":["` + cite + `"]}`
+	})
+	for _, target := range []struct {
+		lesson domain.Record
+		want   bool
+	}{{second, true}, {first, false}} {
+		*prompts = nil
+		req, err := a.CreateRequest(ctx, owner, course.ID, domain.Request{LessonIDs: []string{target.lesson.ID}, Selected: []string{"A"}, Languages: map[string]string{"A": "en"}, UILanguage: "en", Unlimited: true, Settings: domain.OutputSettings{Audience: "first-year students"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		tasks, err := a.StartRequest(ctx, owner, req.ID, "en", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = a.process(ctx, owner, tasks[0].ID); err != nil {
+			t.Fatal(err)
+		}
+		if len(*prompts) == 0 {
+			t.Fatal("no prompts")
+		}
+		for _, prompt := range *prompts {
+			has := strings.Contains(prompt, "eigenvector") && strings.Contains(prompt, "do not explain them again")
+			if has != target.want {
+				t.Fatalf("lesson %q: background present = %v, want %v\n%s", target.lesson.ID, has, target.want, prompt)
+			}
+			if !strings.Contains(prompt, "The class: first-year students.") {
+				t.Fatalf("the audience is stated in the teacher's words:\n%s", prompt)
+			}
+		}
+	}
+}
+
+func lessonUnit(t *testing.T, a *App, owner string, lesson domain.Record) string {
+	t.Helper()
+	_, k := knowledgeOf(t, a, owner, mustGet(t, a, owner, lesson.ID))
+	return k.Units[0].ID
 }
