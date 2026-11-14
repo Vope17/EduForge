@@ -61,7 +61,8 @@ EduForge 是專為**教育工作者**設計的網站，用 AI 生成並編輯四
 │   └── migrations/          # 編號的 SQL migration
 ├── frontend/
 │   ├── src/
-│   │   ├── editors/         # document / slides / pdf / video 各編輯器
+│   │   ├── components/      # 共用 UI 元件（AppIcon 等）
+│   │   ├── editors/         # document / slides / pdf / video 各編輯器；共用 AIEditPanel、RevisionPanel、useUndo
 │   │   ├── selection/       # 框選與多區域選取（跨編輯器共用）
 │   │   ├── stores/          # Pinia
 │   │   ├── i18n/            # zh-TW.json、en.json
@@ -220,6 +221,7 @@ requested → template_generated → awaiting_confirmation → confirmed → gen
 - 僅使用 Composition API 與 `<script setup lang="ts">`；啟用 TypeScript strict。
 - 狀態共用放 Pinia，元件內部狀態放本地。
 - 編輯器元件必須透過 `selection/` 模組提供框選，**不得**各自實作一套。
+- 介面設計以 Paper2Lab 為基準：沿用 `style.css` 的色彩 token、按鈕與面板樣式，新編輯器使用共用的 AIEditPanel、RevisionPanel、useUndo。
 
 **通用**
 - 識別字用英文；程式碼註解與 commit 訊息用繁體中文或英文皆可，同一檔案內保持一致。
