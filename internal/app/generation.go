@@ -141,7 +141,10 @@ func (a *App) generationTargets(ctx context.Context, owner, course string, req d
 			}
 		}
 		if req.UseLessonSettings {
-			settings = p.Settings
+			settings, err = a.EffectiveSettings(ctx, owner, id)
+			if err != nil {
+				return nil, err
+			}
 			if len(settings.Selected) == 0 {
 				return nil, errors.New("lesson_output_settings_required")
 			}

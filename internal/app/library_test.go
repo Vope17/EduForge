@@ -115,7 +115,7 @@ func TestChaptersFileStudiesAndSurviveExport(t *testing.T) {
 	// Saving the study's other fields keeps its chapter.
 	current, _ := a.Store.Get(ctx, owner, lesson.ID, "lesson")
 	p, _ := domain.Decode[domain.Lesson](current.Data)
-	p.Repo = "https://example.org/repo"
+	p.Title = "Renamed lesson"
 	p.Chapter = ""
 	if current, err = a.SaveLesson(ctx, owner, lesson.ID, current.Version, p); err != nil {
 		t.Fatal(err)
@@ -123,7 +123,7 @@ func TestChaptersFileStudiesAndSurviveExport(t *testing.T) {
 	if p, _ = domain.Decode[domain.Lesson](current.Data); p.Chapter != chapter.ID {
 		t.Fatal("saving study fields dropped its chapter")
 	}
-	if _, err = a.RenameChapter(ctx, owner, chapter.ID, "Vision models"); err != nil {
+	if _, err = a.SaveChapter(ctx, owner, chapter.ID, "Vision models", domain.OutputSettings{}); err != nil {
 		t.Fatal(err)
 	}
 

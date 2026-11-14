@@ -150,6 +150,29 @@ func (s *Server) routes() {
 		respond(w, out, err)
 		return nil
 	})
+	s.handle("PUT /api/courses/{id}", func(w http.ResponseWriter, r *http.Request) error {
+		var input struct {
+			Version     int                   `json:"version"`
+			Name        string                `json:"name"`
+			Description string                `json:"description"`
+			Settings    domain.OutputSettings `json:"settings"`
+		}
+		if err := decode(r, w, &input); err != nil {
+			return err
+		}
+		out, err := s.App.SaveCourse(r.Context(), owner(r), r.PathValue("id"), input.Version, input.Name, input.Description, input.Settings)
+		respond(w, out, err)
+		return nil
+	})
+	s.handle("PUT /api/courses/{id}/order", func(w http.ResponseWriter, r *http.Request) error {
+		var input app.CourseOrder
+		if err := decode(r, w, &input); err != nil {
+			return err
+		}
+		err := s.App.ReorderCourse(r.Context(), owner(r), r.PathValue("id"), input)
+		respond(w, map[string]bool{"saved": err == nil}, err)
+		return nil
+	})
 	s.handle("GET /api/summary", func(w http.ResponseWriter, r *http.Request) error {
 		out, err := s.App.Summary(r.Context(), owner(r), r.URL.Query().Get("course_id"))
 		respond(w, out, err)
@@ -228,12 +251,13 @@ func (s *Server) routes() {
 	})
 	s.handle("PUT /api/chapters/{id}", func(w http.ResponseWriter, r *http.Request) error {
 		var input struct {
-			Name string `json:"name"`
+			Name     string                `json:"name"`
+			Settings domain.OutputSettings `json:"settings"`
 		}
 		if err := decode(r, w, &input); err != nil {
 			return err
 		}
-		out, err := s.App.RenameChapter(r.Context(), owner(r), r.PathValue("id"), input.Name)
+		out, err := s.App.SaveChapter(r.Context(), owner(r), r.PathValue("id"), input.Name, input.Settings)
 		respond(w, out, err)
 		return nil
 	})

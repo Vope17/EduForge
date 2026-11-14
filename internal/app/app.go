@@ -101,6 +101,10 @@ func (a *App) CreateCourse(ctx context.Context, owner string, p domain.Course) (
 			return domain.Record{}, err
 		}
 	}
+	p.Settings = NormalizeSettings(p.Settings)
+	if err := validateOutputSettings(p.Settings); err != nil {
+		return domain.Record{}, err
+	}
 	return a.create(ctx, owner, "course", "", "", "", p)
 }
 func NormalizeSettings(s domain.OutputSettings) domain.OutputSettings {
@@ -110,11 +114,8 @@ func NormalizeSettings(s domain.OutputSettings) domain.OutputSettings {
 	if s.Level == "" {
 		s.Level = "intermediate"
 	}
-	if s.Audience == "" {
-		s.Audience = "classmates"
-	}
 	if s.Minutes == 0 {
-		s.Minutes = 10
+		s.Minutes = 50
 	}
 	if s.Languages == nil {
 		s.Languages = map[string]string{}
@@ -167,24 +168,30 @@ func (a *App) CreateLesson(ctx context.Context, owner, course string, p domain.L
 		return domain.Record{}, errors.New("lesson_title_required")
 	}
 	p.KnowledgeID = ""
-	p.Settings = NormalizeSettings(p.Settings)
-	if err := validateOutputSettings(p.Settings); err != nil {
+	if err := validateOverrides(p.Settings); err != nil {
+		return domain.Record{}, err
+	}
+	if p.Chapter != "" {
+		chapter, err := a.Store.Get(ctx, owner, p.Chapter, "chapter")
+		if err != nil || chapter.Course != course {
+			return domain.Record{}, errors.New("chapter_course_mismatch")
+		}
+	}
+	var err error
+	if p.Position, err = a.nextPosition(ctx, owner, course, "lesson"); err != nil {
 		return domain.Record{}, err
 	}
 	return a.create(ctx, owner, "lesson", course, course, "", p)
 }
 func (a *App) SaveLesson(ctx context.Context, owner, id string, version int, p domain.Lesson) (domain.Record, error) {
-	p.Settings = NormalizeSettings(p.Settings)
-	if err := validateOutputSettings(p.Settings); err != nil {
+	if err := validateOverrides(p.Settings); err != nil {
 		return domain.Record{}, err
 	}
 	return set[domain.Lesson](ctx, a, owner, id, version, func(old *domain.Lesson) error {
 		if strings.TrimSpace(p.Title) == "" {
 			return errors.New("lesson_title_required")
 		}
-		old.Title = p.Title
-		old.Group = p.Group
-		old.Repo = p.Repo
+		old.Title = strings.TrimSpace(p.Title)
 		old.Settings = p.Settings
 		return nil
 	})

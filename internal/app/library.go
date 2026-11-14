@@ -74,7 +74,7 @@ func chapterName(name string) (string, error) {
 	return name, nil
 }
 
-// CreateChapter adds a library chapter to a course.
+// CreateChapter adds a chapter to the end of a course.
 func (a *App) CreateChapter(ctx context.Context, owner, course, name string) (domain.Record, error) {
 	if _, err := a.Store.Get(ctx, owner, course, "course"); err != nil {
 		return domain.Record{}, err
@@ -83,11 +83,15 @@ func (a *App) CreateChapter(ctx context.Context, owner, course, name string) (do
 	if err != nil {
 		return domain.Record{}, err
 	}
-	return a.create(ctx, owner, "chapter", course, course, "", domain.Chapter{Name: name})
+	position, err := a.nextPosition(ctx, owner, course, "chapter")
+	if err != nil {
+		return domain.Record{}, err
+	}
+	return a.create(ctx, owner, "chapter", course, course, "", domain.Chapter{Name: name, Position: position})
 }
 
-// RenameChapter changes a chapter's name.
-func (a *App) RenameChapter(ctx context.Context, owner, id, name string) (domain.Record, error) {
+// SaveChapter changes a chapter's name and the settings it overrides.
+func (a *App) SaveChapter(ctx context.Context, owner, id string, name string, settings domain.OutputSettings) (domain.Record, error) {
 	if _, err := a.Store.Get(ctx, owner, id, "chapter"); err != nil {
 		return domain.Record{}, err
 	}
@@ -95,8 +99,12 @@ func (a *App) RenameChapter(ctx context.Context, owner, id, name string) (domain
 	if err != nil {
 		return domain.Record{}, err
 	}
+	if err = validateOverrides(settings); err != nil {
+		return domain.Record{}, err
+	}
 	return set[domain.Chapter](ctx, a, owner, id, 0, func(f *domain.Chapter) error {
 		f.Name = name
+		f.Settings = settings
 		return nil
 	})
 }

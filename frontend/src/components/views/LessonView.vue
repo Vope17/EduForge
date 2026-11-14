@@ -9,7 +9,6 @@ import StepOutputs from '../lesson/StepOutputs.vue'
 import KnowledgePanel from '../KnowledgePanel.vue'
 import type { IconName } from '../../lib/icons.ts'
 import type { Step } from '../../lib/router.ts'
-import type { Lesson } from '../../api/types.ts'
 
 const workspace = useWorkspace()
 const { state, route, go, t, api, act, lesson, openLesson, explain } = workspace
@@ -24,11 +23,6 @@ const fixStep = computed(() => {
   const target = nextStep(steps.value)
   return target !== current.value?.key ? target : ''
 })
-async function updateLesson(patch: Partial<Lesson>) {
-  if (!lesson.value) return
-  const { id, version, data } = lesson.value
-  await act(() => api(`/lessons/${id}`, { method: 'PUT', body: { version, lesson: { ...data, ...patch } } }))
-}
 async function removeLesson() {
   if (!lesson.value) return
   const { id, data } = lesson.value
@@ -44,12 +38,6 @@ async function removeLesson() {
       <div class="grow">
         <h1>{{ lesson.data.title }}</h1>
         <div class="lesson-meta">
-          <label class="inline-field">{{ t('group') }}
-            <input :value="lesson.data.group" :placeholder="t('independent')" @change="updateLesson({ group: ($event.target as HTMLInputElement).value })">
-          </label>
-          <label class="inline-field wide">{{ t('repo') }}
-            <input :value="lesson.data.repo" placeholder="https://…" @change="updateLesson({ repo: ($event.target as HTMLInputElement).value })">
-          </label>
           <label v-if="chapters.length" class="inline-field">{{ t('chapterLabel') }}
             <select :value="chapters.some(f => f.id === lesson!.data.chapter) ? lesson.data.chapter : ''" @change="moveLesson(lesson!.id, ($event.target as HTMLSelectElement).value)">
               <option value="">{{ t('unfiled') }}</option>

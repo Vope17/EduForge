@@ -68,7 +68,7 @@ function openNext(lesson: Rec<Lesson>) { openLesson(lesson.id, nextStep(lessonSt
                 <option value="">{{ t('unfiled') }}</option>
                 <option v-for="chapter in chapters" :key="chapter.id" :value="chapter.id">{{ chapter.data.name }}</option>
               </select>
-              <span v-else class="caption">{{ lesson.data.group || t('independent') }}</span>
+              <span v-else class="caption">{{ t('unfiled') }}</span>
               <button class="text-button" @click="openNext(lesson)">{{ t('continueWork') }} →</button>
             </div>
           </article>

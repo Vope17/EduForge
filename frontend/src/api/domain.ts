@@ -14,23 +14,36 @@ export interface DomainRecord {
   updated_at: string
 }
 
+/**
+ * Course is the top of the hierarchy. Its Settings are the defaults every
+ * chapter and lesson inherits.
+ */
 export interface Course {
   name: string
   description: string
   style: Record<string, Style> | null
+  settings: OutputSettings
 }
 
-/** Chapter groups studies in a course's research library (one level). */
+/**
+ * Chapter groups lessons in a course (one level). Position orders chapters;
+ * Settings holds only what this chapter overrides (zero values inherit).
+ */
 export interface Chapter {
   name: string
+  position: number
+  settings: OutputSettings
 }
 
+/**
+ * Lesson is one class session: its sources, knowledge and outputs hang off
+ * it. Chapter is empty for an unfiled lesson. Position orders lessons within
+ * their chapter; Settings holds only this lesson's overrides.
+ */
 export interface Lesson {
   title: string
-  repo: string
-  group: string
-  /** Chapter is the library chapter holding the study; empty is unfiled. */
   chapter?: string
+  position: number
   knowledge_id: string
   settings: OutputSettings
 }

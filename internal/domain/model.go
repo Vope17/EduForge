@@ -47,22 +47,31 @@ type Record struct {
 	Created string          `json:"created_at"`
 	Updated string          `json:"updated_at"`
 }
+
+// Course is the top of the hierarchy. Its Settings are the defaults every
+// chapter and lesson inherits.
 type Course struct {
 	Name        string           `json:"name"`
 	Description string           `json:"description"`
 	Style       map[string]Style `json:"style"`
+	Settings    OutputSettings   `json:"settings"`
 }
 
-// Chapter groups studies in a course's research library (one level).
+// Chapter groups lessons in a course (one level). Position orders chapters;
+// Settings holds only what this chapter overrides (zero values inherit).
 type Chapter struct {
-	Name string `json:"name"`
+	Name     string         `json:"name"`
+	Position int            `json:"position"`
+	Settings OutputSettings `json:"settings"`
 }
+
+// Lesson is one class session: its sources, knowledge and outputs hang off
+// it. Chapter is empty for an unfiled lesson. Position orders lessons within
+// their chapter; Settings holds only this lesson's overrides.
 type Lesson struct {
-	Title string `json:"title"`
-	Repo  string `json:"repo"`
-	Group string `json:"group"`
-	// Chapter is the library chapter holding the study; empty is unfiled.
+	Title       string         `json:"title"`
 	Chapter     string         `json:"chapter,omitempty"`
+	Position    int            `json:"position"`
 	KnowledgeID string         `json:"knowledge_id"`
 	Settings    OutputSettings `json:"settings"`
 }
