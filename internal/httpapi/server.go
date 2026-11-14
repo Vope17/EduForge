@@ -173,6 +173,18 @@ func (s *Server) routes() {
 		respond(w, map[string]bool{"saved": err == nil}, err)
 		return nil
 	})
+	s.handle("POST /api/courses/{id}/syllabus", func(w http.ResponseWriter, r *http.Request) error {
+		var input struct {
+			Weeks    int    `json:"weeks"`
+			Language string `json:"language"`
+		}
+		if err := decode(r, w, &input); err != nil {
+			return err
+		}
+		out, err := s.App.QueueSyllabus(r.Context(), owner(r), r.PathValue("id"), input.Weeks, input.Language)
+		respond(w, out, err)
+		return nil
+	})
 	s.handle("GET /api/summary", func(w http.ResponseWriter, r *http.Request) error {
 		out, err := s.App.Summary(r.Context(), owner(r), r.URL.Query().Get("course_id"))
 		respond(w, out, err)
@@ -311,7 +323,12 @@ func (s *Server) routes() {
 		if err != nil {
 			return err
 		}
-		out, err := s.App.ImportTemplate(r.Context(), owner(r), r.FormValue("name"), h.Filename, b)
+		var out domain.Record
+		if r.FormValue("kind") == "plan-form" {
+			out, err = s.App.ImportPlanForm(r.Context(), owner(r), r.FormValue("name"), h.Filename, b)
+		} else {
+			out, err = s.App.ImportTemplate(r.Context(), owner(r), r.FormValue("name"), h.Filename, b)
+		}
 		respond(w, out, err)
 		return nil
 	})
@@ -677,11 +694,33 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	format := r.URL.Query().Get("format")
+	if a.Type == "C" || a.Type == "D" || a.Type == "S" {
+		var form []byte
+		if a.Type == "C" {
+			if form, err = s.App.ArtifactPlanForm(r.Context(), owner(r), a); err != nil {
+				return err
+			}
+		}
+		b, typ, name, err := artifacts.StructuredExport(r.Context(), a, format, r.URL.Query().Get("version"), form)
+		if err != nil {
+			return err
+		}
+		if format == "html" && r.URL.Query().Get("preview") == "true" {
+			w.Header().Set("Content-Type", typ)
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+			w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'")
+			_, _ = w.Write(b)
+			return nil
+		}
+		attachment(w, name, typ, b)
+		return nil
+	}
 	k, err := s.App.ArtifactKnowledge(r.Context(), owner(r), a)
 	if err != nil {
 		return err
 	}
-	format := r.URL.Query().Get("format")
 	var b []byte
 	typ := ""
 	switch format {

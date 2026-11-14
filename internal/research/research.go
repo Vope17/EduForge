@@ -118,6 +118,9 @@ func numberSet(text string) map[string]bool {
 	return out
 }
 func Validate(a domain.Artifact, k domain.Knowledge) domain.Check {
+	if a.Type == "C" || a.Type == "D" || a.Type == "S" {
+		return validateStructured(a, k)
+	}
 	check := domain.Check{Status: "checked", Issues: []domain.Issue{}, CheckedAt: domain.Now()}
 	units := map[string]string{}
 	for _, u := range k.Units {

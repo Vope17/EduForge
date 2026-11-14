@@ -86,8 +86,14 @@ type OutputSettings struct {
 	// ReaderTemplateID is an imported Word template for readers (A).
 	ReaderTemplateID string `json:"reader_template_id,omitempty"`
 	// Instructions are the user's own wishes for each kind of output
-	// ("A", "B"), passed to the model as written.
+	// ("A", "B", "C", "D"), passed to the model as written.
 	Instructions map[string]string `json:"instructions,omitempty"`
+	// Questions is how many worksheet questions of each type to write
+	// (choice, fill, short, calc, practice).
+	Questions map[string]int `json:"questions,omitempty"`
+	// PlanFormID is an imported Word form lesson plans are written into; empty
+	// is the built-in form.
+	PlanFormID string `json:"plan_form_id,omitempty"`
 }
 type Unit struct {
 	ID         string `json:"id"`
@@ -292,6 +298,8 @@ type Task struct {
 	// MissedOnly makes a knowledge task read only the pages a previous read
 	// missed, and add to the existing knowledge.
 	MissedOnly bool `json:"missed_only,omitempty"`
+	// Weeks is the length of the course a syllabus task plans.
+	Weeks int `json:"weeks,omitempty"`
 }
 type Step struct {
 	TaskID   string  `json:"task_id"`
@@ -360,15 +368,109 @@ type Artifact struct {
 	Style            StyleSnapshot  `json:"style_snapshot"`
 	Settings         OutputSettings `json:"settings"`
 	Sections         []Section      `json:"sections"`
-	SuggestedTarget  *Section       `json:"suggested_target,omitempty"`
-	Mode             string         `json:"mode"`
-	Check            Check          `json:"check"`
-	Edits            int            `json:"edits"`
-	EditingSeconds   float64        `json:"editing_seconds,omitempty"`
-	Previous         string         `json:"previous_id,omitempty"`
-	EstimatedMinutes float64        `json:"estimated_minutes"`
-	CreatedFrom      string         `json:"created_from,omitempty"`
+	// Plan, Worksheet and Syllabus hold the structured content of outputs C
+	// (lesson plan), D (worksheet) and S (syllabus, a course-level output).
+	Plan             *LessonPlan `json:"plan,omitempty"`
+	Worksheet        *Worksheet  `json:"worksheet,omitempty"`
+	Syllabus         *Syllabus   `json:"syllabus,omitempty"`
+	SuggestedTarget  *Section    `json:"suggested_target,omitempty"`
+	Mode             string      `json:"mode"`
+	Check            Check       `json:"check"`
+	Edits            int         `json:"edits"`
+	EditingSeconds   float64     `json:"editing_seconds,omitempty"`
+	Previous         string      `json:"previous_id,omitempty"`
+	EstimatedMinutes float64     `json:"estimated_minutes"`
+	CreatedFrom      string      `json:"created_from,omitempty"`
 }
+
+// PlanInfo is the lesson plan's basic data.
+type PlanInfo struct {
+	Unit     string `json:"unit"`     // the lesson's name
+	Designer string `json:"designer"` // who wrote the plan
+	Audience string `json:"audience"` // the class
+	Minutes  int    `json:"minutes"`  // class time
+	Source   string `json:"source"`   // course / chapter / lesson the material belongs to
+}
+
+// PlanObjective is one specific learning objective. Code ties it to the
+// activities that teach it (and to worksheet questions); Domain is
+// "cognitive", "affective" or "skill".
+type PlanObjective struct {
+	Code   string `json:"code"`
+	Domain string `json:"domain"`
+	Text   string `json:"text"`
+}
+
+// PlanActivity is one row of the teaching activity table. Phase is "prepare",
+// "develop" or "wrap".
+type PlanActivity struct {
+	Phase       string   `json:"phase"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"` // what the teacher does and what students do
+	Minutes     int      `json:"minutes"`
+	Objectives  []string `json:"objectives"` // objective codes
+	Resources   string   `json:"resources"`
+	Assessment  string   `json:"assessment"`
+}
+
+// LessonPlan is a single-lesson plan in the common table form.
+type LessonPlan struct {
+	Info       PlanInfo        `json:"info"`
+	Goal       string          `json:"goal"`       // the unit goal, one or two sentences
+	Analysis   string          `json:"analysis"`   // analysis of the material
+	Experience string          `json:"experience"` // what students already know
+	Objectives []PlanObjective `json:"objectives"`
+	Activities []PlanActivity  `json:"activities"`
+	References []string        `json:"references"`
+	Citations  []string        `json:"citations"`
+}
+
+// Question is one worksheet question. Type is "choice", "fill", "short",
+// "calc" or "practice". Answer and Explanation belong to the teacher's copy.
+type Question struct {
+	Type        string   `json:"type"`
+	Prompt      string   `json:"prompt"`
+	Choices     []string `json:"choices,omitempty"`
+	Answer      string   `json:"answer"`
+	Explanation string   `json:"explanation"`
+	Objective   string   `json:"objective"` // objective code
+	Points      int      `json:"points"`
+	Citations   []string `json:"citations"`
+}
+
+// Worksheet is a set of questions; the student copy leaves out Answer and Explanation.
+type Worksheet struct {
+	Title     string     `json:"title"`
+	Questions []Question `json:"questions"`
+}
+
+// SyllabusWeek is one row of a course's weekly schedule.
+type SyllabusWeek struct {
+	Week       int    `json:"week"`
+	Topic      string `json:"topic"`
+	Chapters   string `json:"chapters"` // chapters and lessons covered
+	Method     string `json:"method"`
+	Assessment string `json:"assessment"`
+}
+
+// GradeItem is one part of the grading scheme.
+type GradeItem struct {
+	Item    string `json:"item"`
+	Percent int    `json:"percent"`
+}
+
+// Syllabus is a course's syllabus and weekly schedule.
+type Syllabus struct {
+	Name        string         `json:"name"`
+	Audience    string         `json:"audience"`
+	Weeks       int            `json:"weeks"`
+	Description string         `json:"description"`
+	Objectives  []string       `json:"objectives"`
+	Schedule    []SyllabusWeek `json:"schedule"`
+	Grading     []GradeItem    `json:"grading"`
+	Books       []string       `json:"books"`
+}
+
 type Template struct {
 	Name        string   `json:"name"`
 	SourceID    string   `json:"source_id"`

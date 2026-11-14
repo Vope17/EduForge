@@ -53,7 +53,7 @@ func (a *App) CreateRequest(ctx context.Context, owner, course string, req domai
 		return domain.Record{}, errors.New("invalid_language")
 	}
 	for kind, lang := range req.Languages {
-		if kind != "A" && kind != "B" {
+		if !slices.Contains(OutputKinds, kind) {
 			return domain.Record{}, errors.New("invalid_output")
 		}
 		if lang != "" && !domain.Language(lang) {
@@ -74,7 +74,7 @@ func (a *App) CreateRequest(ctx context.Context, owner, course string, req domai
 	req.Targets = targets
 	if req.UseLessonSettings {
 		req.Selected = nil
-		for _, kind := range []string{"A", "B"} {
+		for _, kind := range OutputKinds {
 			for _, target := range targets {
 				if slices.Contains(target.Settings.Selected, kind) {
 					req.Selected = append(req.Selected, kind)
@@ -257,8 +257,11 @@ func (a *App) StartRequest(ctx context.Context, owner, requestID, ui string, use
 		known := research.BackgroundConcepts(a.priorKnowledge(ctx, owner, target.LessonID))
 		for _, kind := range target.Settings.Selected {
 			total := len(research.SectionOrder)
-			if kind == "A" {
+			switch kind {
+			case "A":
 				total = len(research.HandoutParts)
+			case "C", "D":
+				total = 1
 			}
 			t := domain.Task{RequestID: requestID, Type: kind, Status: "queued", Stage: "generate", Language: language(req, target, kind), KnowledgeID: target.KnowledgeID, Settings: target.Settings, Style: targetStyle(req, target, kind), Total: total}
 			t.ReadTerms = known
@@ -501,6 +504,9 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 	if t.Type == "knowledge" {
 		return a.knowledgeTask(ctx, owner, r)
 	}
+	if t.Type == "syllabus" {
+		return a.syllabusTask(ctx, owner, r)
+	}
 	_, k, err := get[domain.Knowledge](ctx, a, owner, t.KnowledgeID, "knowledge")
 	if err != nil {
 		return err
@@ -519,6 +525,9 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 	}
 	kind := strings.TrimPrefix(t.Type, "preview:")
 	preview := strings.HasPrefix(t.Type, "preview:")
+	if kind == "C" || kind == "D" {
+		return a.writeStructured(ctx, owner, id, r, t, k, kind)
+	}
 	steps, err := a.Store.List(ctx, owner, store.Filter{Kind: "step", Parent: id})
 	if err != nil {
 		return err
@@ -947,11 +956,31 @@ func (a *App) EditArtifact(ctx context.Context, owner, id string, version int, i
 	if old.Version != version {
 		return old, domain.ErrConflict
 	}
-	k, err := a.ArtifactKnowledge(ctx, owner, a0)
-	if err != nil {
-		return old, err
+	var k domain.Knowledge
+	if a0.Type != "S" { // a syllabus belongs to a course and has no lesson knowledge
+		if k, err = a.ArtifactKnowledge(ctx, owner, a0); err != nil {
+			return old, err
+		}
 	}
 	a0.Sections = input.Sections
+	switch a0.Type {
+	case "C":
+		if input.Plan == nil {
+			return old, errors.New("plan_required")
+		}
+		a0.Plan = input.Plan
+	case "D":
+		if input.Worksheet == nil {
+			return old, errors.New("worksheet_required")
+		}
+		a0.Worksheet = input.Worksheet
+		a0.Settings.Questions = input.Settings.Questions
+	case "S":
+		if input.Syllabus == nil {
+			return old, errors.New("syllabus_required")
+		}
+		a0.Syllabus = input.Syllabus
+	}
 	if input.EditingSeconds < 0 || math.IsNaN(input.EditingSeconds) || math.IsInf(input.EditingSeconds, 0) {
 		return old, errors.New("invalid_editing_time")
 	}

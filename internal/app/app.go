@@ -122,13 +122,18 @@ func NormalizeSettings(s domain.OutputSettings) domain.OutputSettings {
 	}
 	return s
 }
+
+// OutputKinds are the outputs of a lesson: A handout, B class slides, C lesson
+// plan, D worksheet. (S, the syllabus, belongs to a course.)
+var OutputKinds = []string{"A", "B", "C", "D"}
+
 func validKinds(kinds []string) error {
 	seen := map[string]bool{}
 	if len(kinds) == 0 {
 		return errors.New("select_output")
 	}
 	for _, kind := range kinds {
-		if kind != "A" && kind != "B" {
+		if !slices.Contains(OutputKinds, kind) {
 			return errors.New("invalid_output")
 		}
 		if seen[kind] {
@@ -145,7 +150,7 @@ func validateOutputSettings(s domain.OutputSettings) error {
 		}
 	}
 	for kind, lang := range s.Languages {
-		if !slices.Contains([]string{"A", "B"}, kind) {
+		if !slices.Contains(OutputKinds, kind) {
 			return errors.New("invalid_output")
 		}
 		if lang != "" && !domain.Language(lang) {
@@ -313,6 +318,48 @@ func (a *App) SaveKnowledge(ctx context.Context, owner, lessonID string, expecte
 
 // ImportTemplate stores a PowerPoint template (.pptx or .potx) and reads its
 // layouts, colours and fonts so decks can be built on it.
+// ImportPlanForm stores a Word form for lesson plans (.docx or .dotx). It must
+// carry the labels a plan is written by; one that lacks the unit name or the
+// activity table is refused with the labels it is missing.
+func (a *App) ImportPlanForm(ctx context.Context, owner, name, filename string, b []byte) (domain.Record, error) {
+	ext := strings.ToLower(filepath.Ext(filename))
+	if ext != ".docx" && ext != ".dotx" {
+		return domain.Record{}, errors.New("plan_form_must_be_word")
+	}
+	if len(b) < 4 || len(b) > 32<<20 || string(b[:2]) != "PK" {
+		return domain.Record{}, errors.New("invalid_office_file")
+	}
+	if _, _, err := artifacts.FillPlanForm(b, domain.LessonPlan{}, "zh-TW"); err != nil {
+		return domain.Record{}, err
+	}
+	rel, _, err := a.Store.Blob(b, ext)
+	if err != nil {
+		return domain.Record{}, err
+	}
+	t := domain.Template{Kind: "plan-form", File: rel, Name: strings.TrimSpace(name)}
+	if t.Name == "" {
+		t.Name = strings.TrimSuffix(filepath.Base(filename), filepath.Ext(filename))
+	}
+	return a.create(ctx, owner, "template", "", "", "", t)
+}
+
+// ArtifactPlanForm returns the Word form a lesson plan is written into: the
+// one chosen in its settings, or nil for the built-in form.
+func (a *App) ArtifactPlanForm(ctx context.Context, owner string, art domain.Artifact) ([]byte, error) {
+	if art.Settings.PlanFormID == "" {
+		return nil, nil
+	}
+	t, err := a.templateOf(ctx, owner, art.Settings.PlanFormID, "plan-form")
+	if err != nil {
+		return nil, err
+	}
+	file, err := a.Store.Path(t.File)
+	if err != nil {
+		return nil, err
+	}
+	return os.ReadFile(file)
+}
+
 func (a *App) ImportTemplate(ctx context.Context, owner, name, filename string, b []byte) (domain.Record, error) {
 	ext := strings.ToLower(filepath.Ext(filename))
 	word := ext == ".docx" || ext == ".dotx"

@@ -197,6 +197,7 @@ func MergeSettings(base, over domain.OutputSettings) domain.OutputSettings {
 	out := base
 	out.Languages = maps.Clone(base.Languages)
 	out.Instructions = maps.Clone(base.Instructions)
+	out.Questions = maps.Clone(base.Questions)
 	if len(over.Selected) > 0 {
 		out.Selected = slices.Clone(over.Selected)
 	}
@@ -218,6 +219,9 @@ func MergeSettings(base, over domain.OutputSettings) domain.OutputSettings {
 	if over.ReaderTemplateID != "" {
 		out.ReaderTemplateID = over.ReaderTemplateID
 	}
+	if over.PlanFormID != "" {
+		out.PlanFormID = over.PlanFormID
+	}
 	if len(over.Languages) > 0 && out.Languages == nil {
 		out.Languages = map[string]string{}
 	}
@@ -232,6 +236,14 @@ func MergeSettings(base, over domain.OutputSettings) domain.OutputSettings {
 	for kind, text := range over.Instructions {
 		if text != "" {
 			out.Instructions[kind] = text
+		}
+	}
+	for kind, n := range over.Questions {
+		if n > 0 {
+			if out.Questions == nil {
+				out.Questions = map[string]int{}
+			}
+			out.Questions[kind] = n
 		}
 	}
 	return NormalizeSettings(out)

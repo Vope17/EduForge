@@ -60,9 +60,19 @@ export interface OutputSettings {
   reader_template_id?: string
   /**
    * Instructions are the user's own wishes for each kind of output
-   * ("A", "B"), passed to the model as written.
+   * ("A", "B", "C", "D"), passed to the model as written.
    */
   instructions?: Record<string, string>
+  /**
+   * Questions is how many worksheet questions of each type to write
+   * (choice, fill, short, calc, practice).
+   */
+  questions?: Record<string, number>
+  /**
+   * PlanFormID is an imported Word form lesson plans are written into; empty
+   * is the built-in form.
+   */
+  plan_form_id?: string
 }
 
 export interface Unit {
@@ -304,6 +314,8 @@ export interface Task {
    * missed, and add to the existing knowledge.
    */
   missed_only?: boolean
+  /** Weeks is the length of the course a syllabus task plans. */
+  weeks?: number
 }
 
 export interface Step {
@@ -386,6 +398,13 @@ export interface Artifact {
   style_snapshot: StyleSnapshot
   settings: OutputSettings
   sections: Section[] | null
+  /**
+   * Plan, Worksheet and Syllabus hold the structured content of outputs C
+   * (lesson plan), D (worksheet) and S (syllabus, a course-level output).
+   */
+  plan?: LessonPlan
+  worksheet?: Worksheet
+  syllabus?: Syllabus
   suggested_target?: Section
   mode: string
   check: Check
@@ -394,6 +413,112 @@ export interface Artifact {
   previous_id?: string
   estimated_minutes: number
   created_from?: string
+}
+
+/** PlanInfo is the lesson plan's basic data. */
+export interface PlanInfo {
+  /** the lesson's name */
+  unit: string
+  /** who wrote the plan */
+  designer: string
+  /** the class */
+  audience: string
+  /** class time */
+  minutes: number
+  /** course / chapter / lesson the material belongs to */
+  source: string
+}
+
+/**
+ * PlanObjective is one specific learning objective. Code ties it to the
+ * activities that teach it (and to worksheet questions); Domain is
+ * "cognitive", "affective" or "skill".
+ */
+export interface PlanObjective {
+  code: string
+  domain: string
+  text: string
+}
+
+/**
+ * PlanActivity is one row of the teaching activity table. Phase is "prepare",
+ * "develop" or "wrap".
+ */
+export interface PlanActivity {
+  phase: string
+  title: string
+  /** what the teacher does and what students do */
+  description: string
+  minutes: number
+  /** objective codes */
+  objectives: string[] | null
+  resources: string
+  assessment: string
+}
+
+/** LessonPlan is a single-lesson plan in the common table form. */
+export interface LessonPlan {
+  info: PlanInfo
+  /** the unit goal, one or two sentences */
+  goal: string
+  /** analysis of the material */
+  analysis: string
+  /** what students already know */
+  experience: string
+  objectives: PlanObjective[] | null
+  activities: PlanActivity[] | null
+  references: string[] | null
+  citations: string[] | null
+}
+
+/**
+ * Question is one worksheet question. Type is "choice", "fill", "short",
+ * "calc" or "practice". Answer and Explanation belong to the teacher's copy.
+ */
+export interface Question {
+  type: string
+  prompt: string
+  choices?: string[]
+  answer: string
+  explanation: string
+  /** objective code */
+  objective: string
+  points: number
+  citations: string[] | null
+}
+
+/** Worksheet is a set of questions; the student copy leaves out Answer and Explanation. */
+export interface Worksheet {
+  title: string
+  questions: Question[] | null
+}
+
+/** SyllabusWeek is one row of a course's weekly schedule. */
+export interface SyllabusWeek {
+  week: number
+  topic: string
+  /** chapters and lessons covered */
+  chapters: string
+  method: string
+  assessment: string
+}
+
+/** GradeItem is one part of the grading scheme. */
+export interface GradeItem {
+  item: string
+  percent: number
+}
+
+/** Syllabus is a course's syllabus and weekly schedule. */
+export interface Syllabus {
+  name: string
+  audience: string
+  weeks: number
+  description: string
+  objectives: string[] | null
+  schedule: SyllabusWeek[] | null
+  grading: GradeItem[] | null
+  books: string[] | null
 }
 
 export interface Template {
