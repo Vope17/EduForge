@@ -1,157 +1,74 @@
 <script setup lang="ts">
-import { computed, ref, watch, watchEffect } from 'vue'
-import { RouterLink, RouterView, useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
-import { usePreferencesStore } from './stores/preferences'
-import AppIcon from './components/AppIcon.vue'
-import type { IconName } from './components/icons'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { createWorkspace } from './lib/workspace.ts'
+import { activeTasks } from './lib/status.ts'
+import AppSidebar from './components/shell/AppSidebar.vue'
+import TopBar from './components/shell/TopBar.vue'
+import TaskDrawer from './components/shell/TaskDrawer.vue'
+import ProjectHome from './components/views/ProjectHome.vue'
+import PaperView from './components/views/PaperView.vue'
+import BatchView from './components/views/BatchView.vue'
+import SettingsView from './components/views/SettingsView.vue'
 
-const preferences = usePreferencesStore()
-const route = useRoute()
-const { t, locale } = useI18n()
-// The sidebar slides in over the page on narrow screens.
-const navOpen = ref(false)
+const { state, route, go, t, init, refresh, explain } = createWorkspace()
+const ready = ref(false)
 
-watchEffect(() => {
-  locale.value = preferences.locale
-  document.documentElement.lang = preferences.locale
-  document.title = t('app.title')
+// Poll quickly only while something is running; otherwise stay quiet.
+const busyRemote = computed(() => activeTasks(state.snapshot).length > 0 ||
+  (state.snapshot.run || []).some(r => !['finished', 'manual', 'needs_environment', 'cancelled', 'failed'].includes(r.data.progress)))
+let timer: ReturnType<typeof setTimeout> | undefined
+function schedule() {
+  clearTimeout(timer)
+  timer = setTimeout(async () => {
+    if (!document.hidden) await refresh().catch(() => {})
+    schedule()
+  }, busyRemote.value ? 2500 : 15000)
+}
+watch(busyRemote, schedule)
+onMounted(async () => {
+  await init()
+  ready.value = true
+  schedule()
 })
-watch(() => route.fullPath, () => { navOpen.value = false })
+onUnmounted(() => clearTimeout(timer))
 
-// Sidebar sections; `match` lists the routes that belong to each.
-const sections: { name: string; label: string; icon: IconName; match: string[] }[] = [
-  { name: 'home', label: 'app.home', icon: 'home', match: ['home'] },
-  { name: 'documents', label: 'documents.title', icon: 'file', match: ['documents', 'document'] },
-  { name: 'slides', label: 'slides.title', icon: 'template', match: ['slides', 'slide-deck'] },
-]
-const current = computed(() => sections.find((section) => section.match.includes(String(route.name))))
-const crumbs = computed(() => {
-  if (route.name === 'model-settings') return [t('models.title')]
-  if (!current.value || current.value.name === 'home') return [t('app.name')]
-  const list = [t(current.value.label)]
-  if (route.name === 'document' || route.name === 'slide-deck') list.push(t('app.editing'))
-  return list
+// Route → workspace context
+watch(() => [route.name, route.project, route.paper], async () => {
+  if (route.project && route.project !== state.projectID) {
+    state.projectID = route.project
+    state.selected = []
+    await refresh().catch(() => {})
+  }
+  state.paperID = route.name === 'paper' ? route.paper ?? '' : ''
+  state.nav = false
+}, { immediate: true })
+watch(() => [route.name, route.step, route.tab], () => { state.nav = false })
+
+// Normalize the URL once projects are known (e.g. "#/" → first project).
+watch(() => [ready.value, state.projectID], () => {
+  if (!ready.value) return
+  if (route.name === 'home' && !route.project && state.projectID) go({ name: 'home', project: state.projectID }, { replace: true })
+  if (route.name === 'paper' && !(state.snapshot.paper || []).some(p => p.id === route.paper)) go({ name: 'home', project: state.projectID }, { replace: true })
 })
+watch(() => state.language, lang => { document.documentElement.lang = lang }, { immediate: true })
 </script>
 
 <template>
-  <a
-    class="skip-link"
-    href="#main"
-  >{{ t('app.skip') }}</a>
   <div class="app-shell">
-    <div
-      v-if="navOpen"
-      class="nav-backdrop"
-      @click="navOpen = false"
-    />
-    <aside
-      class="sidebar"
-      :class="{ open: navOpen }"
-    >
-      <RouterLink
-        class="brand"
-        to="/"
-      >
-        <span
-          class="brand-symbol"
-          aria-hidden="true"
-        >E<span>F</span></span>
-        <span>Edu<span class="brand-light">Forge</span><small>{{ t('app.tagline') }}</small></span>
-      </RouterLink>
-
-      <p class="sidebar-label">
-        {{ t('app.navigation') }}
-      </p>
-      <nav
-        class="side-nav"
-        :aria-label="t('app.navigation')"
-      >
-        <RouterLink
-          v-for="section in sections"
-          :key="section.name"
-          class="side-link"
-          :class="{ active: current?.name === section.name }"
-          :to="{ name: section.name }"
-        >
-          <AppIcon :name="section.icon" />{{ t(section.label) }}
-        </RouterLink>
-      </nav>
-
-      <div class="sidebar-bottom">
-        <RouterLink
-          class="side-link"
-          :class="{ active: route.name === 'model-settings' }"
-          :to="{ name: 'model-settings' }"
-        >
-          <AppIcon name="plug" />{{ t('models.title') }}
-        </RouterLink>
-        <div
-          class="language-switch"
-          role="group"
-          :aria-label="t('language.label')"
-        >
-          <button
-            type="button"
-            :class="{ active: preferences.locale === 'zh-TW' }"
-            :aria-pressed="preferences.locale === 'zh-TW'"
-            @click="preferences.setLocale('zh-TW')"
-          >
-            繁中
-          </button>
-          <button
-            type="button"
-            :class="{ active: preferences.locale === 'en' }"
-            :aria-pressed="preferences.locale === 'en'"
-            @click="preferences.setLocale('en')"
-          >
-            EN
-          </button>
-        </div>
+    <AppSidebar />
+    <main class="workspace">
+      <TopBar />
+      <div v-if="state.error" class="error-banner" role="alert">
+        <span>{{ explain(state.error) }}</span>
+        <button :aria-label="t('close')" @click="state.error = ''">×</button>
       </div>
-    </aside>
-
-    <div class="workspace-column">
-      <header class="topbar">
-        <button
-          type="button"
-          class="menu-button"
-          :aria-label="t('app.menu')"
-          :aria-expanded="navOpen"
-          @click="navOpen = true"
-        >
-          <AppIcon name="menu" />
-        </button>
-        <nav
-          class="crumbs"
-          :aria-label="t('app.breadcrumb')"
-        >
-          <template
-            v-for="(crumb, index) in crumbs"
-            :key="index"
-          >
-            <span
-              v-if="index"
-              class="crumb-sep"
-            >/</span>
-            <span :class="{ 'crumb-current': index === crumbs.length - 1 }">{{ crumb }}</span>
-          </template>
-        </nav>
-        <div class="topbar-actions">
-          <RouterLink
-            class="conn-chip"
-            :to="{ name: 'model-settings' }"
-          >
-            <span class="conn-dot" /><span class="conn-label">{{ t('models.title') }}</span>
-          </RouterLink>
-        </div>
-      </header>
-      <RouterView :key="route.path" />
-      <footer class="site-footer">
-        <span>{{ t('footer.note') }}</span>
-        <span>{{ t('footer.milestone') }}</span>
-      </footer>
-    </div>
+      <div v-if="!ready" class="page-content"><p class="empty-inline">{{ t('loading') }}</p></div>
+      <SettingsView v-else-if="route.name === 'settings'" />
+      <PaperView v-else-if="route.name === 'paper' && state.paperID" :key="state.paperID" />
+      <BatchView v-else-if="route.name === 'batch'" />
+      <ProjectHome v-else />
+    </main>
+    <TaskDrawer />
+    <div v-if="state.toast" class="toast" role="status">✓ {{ state.toast }}</div>
   </div>
 </template>

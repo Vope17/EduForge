@@ -1,0 +1,8 @@
+{
+  "extends": "@vue/tsconfig/tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "erasableSyntaxOnly": true
+  },
+  "include": ["vite.config.ts"]
+}

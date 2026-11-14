@@ -1,31 +1,36 @@
-COMPOSE ?= docker compose
-
-.PHONY: dev up down build test lint migrate config
-
-dev:
-	$(COMPOSE) -f compose.yaml -f compose.dev.yaml up --build --watch
-
-up:
-	$(COMPOSE) up --build --detach --wait --wait-timeout 120
-
-down:
-	$(COMPOSE) down --remove-orphans
-
-build:
-	$(COMPOSE) build backend frontend
+.PHONY: test build web run check compose types typecheck
 
 test:
-	$(COMPOSE) --profile tools run --rm --build --no-deps backend-tools go test ./...
-	$(COMPOSE) --profile tools run --rm --build --no-deps frontend-tools npm test
+	go test -race ./...
+	node scripts/gen-types.mjs --check
+	node tests/frontend.test.mjs
+	node tests/store-schema.test.mjs
 
-lint:
-	$(COMPOSE) --profile tools run --rm --build --no-deps backend-tools sh -ec 'files="$$(gofmt -l .)"; if [ -n "$$files" ]; then printf "%s\n" "$$files"; exit 1; fi; go vet ./...'
-	$(COMPOSE) --profile tools run --rm --build --no-deps frontend-tools npm run lint
+# Regenerates frontend/src/api/domain.ts after changing the Go structs it mirrors.
+types:
+	node scripts/gen-types.mjs
 
-migrate:
-	$(COMPOSE) run --rm --build --no-deps backend migrate
+typecheck:
+	node scripts/gen-types.mjs --check
+	cd frontend && npm run typecheck
 
-config:
-	$(COMPOSE) config --quiet
-	$(COMPOSE) -f compose.yaml -f compose.dev.yaml config --quiet
+web:
+	cd frontend && npm ci && npm run build
 
+build: web
+	mkdir -p bin
+	go build -buildvcs=false -trimpath -o bin/eduforge ./cmd/eduforge
+
+run:
+	go run ./cmd/eduforge serve
+
+check:
+	go vet ./...
+	go test -race ./...
+	node scripts/gen-types.mjs --check
+	cd frontend && npm run build
+	node tests/frontend.test.mjs
+	node tests/store-schema.test.mjs
+
+compose:
+	docker compose up --build -d

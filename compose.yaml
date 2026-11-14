@@ -1,77 +1,32 @@
+# Fixed project name: volumes are eduforge_eduforge-{data,secrets,workspace}
+# regardless of the checkout directory. Verification scripts pass their own -p.
 name: eduforge
 
 services:
-  backend:
+  eduforge:
     build:
       context: .
-      dockerfile: backend/Dockerfile
-      target: production
       args:
         CODEX_VERSION: ${CODEX_VERSION:-0.167.1}
-    environment:
-      HTTP_ADDR: :8080
-      EDUFORGE_DB: /data/eduforge.sqlite
-      EDUFORGE_LLM_ENDPOINT: ${EDUFORGE_LLM_ENDPOINT:-}
-      EDUFORGE_LLM_MODEL: ${EDUFORGE_LLM_MODEL:-}
-      EDUFORGE_LLM_API_KEY: ${EDUFORGE_LLM_API_KEY:-}
-      EDUFORGE_DAILY_GENERATIONS: ${EDUFORGE_DAILY_GENERATIONS:-30}
-    volumes:
-      - document-data:/data
-      # ChatGPT sign-in kept by Codex CLI (auth.json); delete the volume to forget it.
-      - codex-data:/codex
-    expose:
-      - "8080"
-    init: true
-    restart: unless-stopped
-    read_only: true
-    tmpfs:
-      - /tmp
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/v1/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
-
-  frontend:
-    build:
-      context: ./frontend
-      target: production
+        CLAUDE_CODE_VERSION: ${CLAUDE_CODE_VERSION:-2.1.290}
     ports:
       - "127.0.0.1:${EDUFORGE_PORT:-8081}:8080"
-    depends_on:
-      backend:
-        condition: service_healthy
-    init: true
+    environment:
+      EDUFORGE_ORIGINS: "http://127.0.0.1:8081,http://127.0.0.1:${EDUFORGE_PORT:-8081},http://localhost:${EDUFORGE_PORT:-8081}"
+    volumes:
+      - eduforge-data:/data
+      - eduforge-secrets:/secrets
+      - eduforge-workspace:/workspace
     restart: unless-stopped
-    read_only: true
-    tmpfs:
-      - /tmp
+    stop_grace_period: 30s
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
-      interval: 10s
-      timeout: 3s
+      test: ["CMD", "eduforge", "healthcheck", "--url", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 5s
       retries: 3
       start_period: 5s
-
-  backend-tools:
-    environment:
-      EDUFORGE_EXPORT_INTEGRATION: "1"
-    profiles: [tools]
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-      target: development
-    command: ["go", "test", "./..."]
-
-  frontend-tools:
-    profiles: [tools]
-    build:
-      context: ./frontend
-      target: development
-    command: ["npm", "test"]
-
-
+      start_interval: 1s
 volumes:
-  document-data:
-  codex-data:
+  eduforge-data:
+  eduforge-secrets:
+  eduforge-workspace:
