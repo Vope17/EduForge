@@ -5,6 +5,7 @@ import { lessonSteps, nextStep } from '../../lib/status.ts'
 import { chapterList, groupLessons, libraryActions, moveChapterBy, moveLessonBy, moveLessonTo, orderOf } from '../../lib/library.ts'
 import { effectiveSettings, type SettingsOverride } from '../../lib/settings.ts'
 import SettingsFields from '../settings/SettingsFields.vue'
+import ArtifactList from '../generation/ArtifactList.vue'
 import Icon from '../Icon.vue'
 import StepDots from '../lesson/StepDots.vue'
 import NewLessonDialog from '../dialogs/NewLessonDialog.vue'
@@ -40,6 +41,13 @@ async function saveCourseSettings(value: SettingsOverride) {
 async function saveChapterSettings(chapter: Rec<Chapter>, value: SettingsOverride) {
   await act(() => api(`/chapters/${chapter.id}`, { method: 'PUT', body: { name: chapter.data.name, settings: { ...chapter.data.settings, ...value } } }))
   chapterSettings.value = ''
+}
+// The course's syllabus: written from its lessons in teaching order.
+const syllabi = computed(() => (state.snapshot.artifact || []).filter(a => a.data.type === 'S').slice().reverse())
+const weeks = ref(16)
+const syllabusBusy = computed(() => (state.snapshot.task || []).some(x => x.data.type === 'syllabus' && ['queued', 'running'].includes(x.data.status)))
+async function writeSyllabus() {
+  await act(() => api(`/courses/${state.courseID}/syllabus`, { method: 'POST', body: { weeks: weeks.value, language: state.language } }))
 }
 const courseDefaults = computed(() => effectiveSettings(course.value?.data.settings))
 const inheritedForChapter = computed(() => courseDefaults.value)
@@ -99,6 +107,15 @@ function openNext(lesson: Rec<Lesson>) { openLesson(lesson.id, nextStep(lessonSt
           <p class="caption">{{ t('courseSettingsHint') }}</p>
           <SettingsFields mode="default" :model-value="course.data.settings" :busy="!!state.busy" @save="saveCourseSettings" />
         </template>
+      </section>
+      <section v-if="lessons.length" class="panel syllabus-panel">
+        <div class="section-heading"><h2>{{ t('S') }}</h2></div>
+        <p class="caption">{{ t('syllabusHint') }}</p>
+        <div class="button-row">
+          <label class="inline-field">{{ t('syllabusWeeks') }}<input v-model.number="weeks" type="number" min="1" max="40"></label>
+          <button class="secondary" :disabled="!!state.busy || syllabusBusy || state.connection.mode === 'none'" @click="writeSyllabus">{{ t('generateSyllabus') }} →</button>
+        </div>
+        <ArtifactList v-if="syllabi.length" :artifacts="syllabi" />
       </section>
       <p v-if="lessons.length > 1" class="caption order-hint">{{ t('teachingOrderHint') }}</p>
       <section v-for="group in groups" :key="group.key" class="lesson-chapter" :class="{ 'drop-target': over === 'group:' + group.key }" @dragover.prevent="over = 'group:' + group.key" @dragleave.self="over = ''" @drop.prevent.stop="dropOn(group.key)">

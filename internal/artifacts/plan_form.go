@@ -355,7 +355,7 @@ func FillPlanForm(form []byte, p domain.LessonPlan, lang string) ([]byte, []stri
 		missing = append(missing, "activities")
 	}
 	if len(missing) > 0 {
-		return nil, missing, fmt.Errorf("plan_form_missing_labels: %s", strings.Join(missing, ","))
+		return nil, missing, errors.New("plan_form_missing_labels")
 	}
 	var out bytes.Buffer
 	zw := zip.NewWriter(&out)
@@ -413,9 +413,9 @@ func PlanFormTemplate(lang string) []byte {
 		wRow(label(1500, l("情意目標", "Affective")), value(8138, 1)),
 		wRow(label(1500, l("技能目標", "Skill")), value(8138, 1)),
 	)
-	w := []int{1100, 1000, 3338, 900, 1700, 1600}
+	w := []int{1000, 1200, 3138, 1000, 1700, 1600}
 	acts := wTable(w,
-		wRow(label(w[0], l("階段", "Phase")), label(w[1], l("目標代號", "Objectives")), label(w[2], l("教學活動", "Activity")), label(w[3], l("時間（分鐘）", "Minutes")), label(w[4], l("教學資源", "Resources")), label(w[5], l("評量方式", "Assessment"))),
+		wRow(label(w[0], l("階段", "Phase")), label(w[1], l("目標代號", "Objectives")), label(w[2], l("教學活動", "Activity")), label(w[3], l("時間（分）", "Minutes")), label(w[4], l("教學資源", "Resources")), label(w[5], l("評量方式", "Assessment"))),
 		wRow(value(w[0], 1), value(w[1], 1), value(w[2], 1), value(w[3], 1), value(w[4], 1), value(w[5], 1)),
 		wRow(wCell(w[0]+w[1]+w[2], 3, shade, true, l("合計", "Total")), value(w[3], 1), wCell(w[4]+w[5], 2, "", false, "")),
 	)

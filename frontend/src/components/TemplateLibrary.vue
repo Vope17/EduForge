@@ -54,6 +54,21 @@ async function importTemplate(event: Event) {
   input.value = ''
   if (result) name.value = ''
 }
+// Lesson plan forms: Word files whose labels (單元名稱, 教學活動…) a plan is written by.
+const planForms = computed(() => all.value.filter(x => x.data.kind === 'plan-form'))
+const importingForm = ref(false)
+async function importPlanForm(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  const body = new FormData()
+  body.append('file', file)
+  body.append('kind', 'plan-form')
+  importingForm.value = true
+  await act(() => api<Rec<Template>>('/templates', { method: 'POST', body }))
+  importingForm.value = false
+  input.value = ''
+}
 async function rename(item: Rec<Template>) {
   const next = prompt(t('templateName'), item.data.name)
   if (!next || next === item.data.name) return
@@ -115,6 +130,20 @@ async function remove(item: Rec<Template>) {
           </div>
         </article>
       </div>
+    </section>
+    <section class="template-group">
+      <h3>{{ t('planForm') }}</h3>
+      <p class="caption">{{ t('planFormHint') }}</p>
+      <p v-if="!planForms.length" class="empty-inline">{{ t('builtInForm') }}</p>
+      <div v-for="item in planForms" :key="item.id" class="source-row">
+        <span class="file-icon">DOC</span>
+        <div class="grow"><strong>{{ item.data.name }}</strong></div>
+        <button class="text-button" @click="rename(item)">{{ t('rename') }}</button>
+        <button class="text-button danger" @click="remove(item)">{{ t('delete') }}</button>
+      </div>
+      <label class="file-picker"><Icon name="upload" /> {{ importingForm ? t('templateImporting') : t('importPlanForm') }}
+        <input type="file" accept=".docx,.dotx" :disabled="importingForm" @change="importPlanForm">
+      </label>
     </section>
     <TemplateEditor v-if="editingID" :id="editingID" @close="editingID = ''" />
     <TemplateExtraction v-if="reviewingID" :id="reviewingID" @close="reviewingID = ''" @done="extracted" />

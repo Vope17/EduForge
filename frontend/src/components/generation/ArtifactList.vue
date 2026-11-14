@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useWorkspace } from '../../lib/workspace.ts'
 import ArtifactEditor from '../ArtifactEditor.vue'
+import StructuredEditor from '../StructuredEditor.vue'
 import type { Artifact, Rec } from '../../api/types.ts'
 
 const props = defineProps<{ artifacts: Rec<Artifact>[] }>()
@@ -47,7 +48,7 @@ const older = computed(() => props.artifacts.filter(a => !latest.value.includes(
     <div class="artifact-grid">
       <article v-for="artifact in latest" :key="artifact.id" class="artifact-card">
         <div class="form-row">
-          <span class="output-letter small-letter">{{ artifact.data.type === 'B' ? 'PPT' : 'DOC' }}</span>
+          <span class="output-letter small-letter">{{ artifact.data.type === 'B' ? 'PPT' : artifact.data.type === 'S' ? 'DOC' : 'DOC' }}</span>
         </div>
         <h3>{{ artifact.data.grouped_lesson_ids?.length ? artifact.data.grouped_lesson_ids.map(studyTitle).join(' / ') : t(artifact.data.type) }}</h3>
         <p class="caption">{{ artifact.data.language }} · v{{ artifact.version }} · {{ new Date(artifact.created_at).toLocaleString(state.language) }}</p>
@@ -59,21 +60,34 @@ const older = computed(() => props.artifacts.filter(a => !latest.value.includes(
         </div>
         <div class="download-links">
           <span class="caption">{{ t('download') }}</span>
-          <a :href="`/api/artifacts/${artifact.id}/download?format=html`" download>HTML</a>
-          <a :href="`/api/artifacts/${artifact.id}/download?format=pdf`" download>PDF</a>
-          <a v-if="artifact.data.type === 'B'" :href="`/api/artifacts/${artifact.id}/download?format=pptx`" download>PPTX</a>
+          <template v-if="artifact.data.type === 'D'">
+            <a :href="`/api/artifacts/${artifact.id}/download?format=docx`" download>{{ t('studentCopy') }} Word</a>
+            <a :href="`/api/artifacts/${artifact.id}/download?format=docx&version=teacher`" download>{{ t('teacherCopy') }} Word</a>
+            <a :href="`/api/artifacts/${artifact.id}/download?format=pdf`" download>PDF</a>
+          </template>
+          <template v-else-if="['C', 'S'].includes(artifact.data.type)">
+            <a :href="`/api/artifacts/${artifact.id}/download?format=docx`" download>Word</a>
+            <a :href="`/api/artifacts/${artifact.id}/download?format=pdf`" download>PDF</a>
+            <a v-if="artifact.data.type === 'S'" :href="`/api/artifacts/${artifact.id}/download?format=tsv`" download>{{ t('tsvDownload') }}</a>
+          </template>
+          <template v-else>
+            <a :href="`/api/artifacts/${artifact.id}/download?format=html`" download>HTML</a>
+            <a :href="`/api/artifacts/${artifact.id}/download?format=pdf`" download>PDF</a>
+            <a v-if="artifact.data.type === 'B'" :href="`/api/artifacts/${artifact.id}/download?format=pptx`" download>PPTX</a>
+          </template>
         </div>
       </article>
     </div>
     <details v-if="older.length">
       <summary>{{ t('olderVersions') }} <span class="count">{{ older.length }}</span></summary>
       <div v-for="artifact in older" :key="artifact.id" class="source-row">
-        <span class="file-icon">{{ artifact.data.type === 'B' ? 'PPT' : 'DOC' }}</span>
+        <span class="file-icon">{{ artifact.data.type === 'B' ? 'PPT' : artifact.data.type === 'S' ? 'DOC' : 'DOC' }}</span>
         <div class="grow"><strong>{{ t(artifact.data.type) }}</strong><small>{{ artifact.data.language }} · v{{ artifact.version }} · {{ new Date(artifact.created_at).toLocaleString(state.language) }}</small></div>
         <button class="text-button" @click="open(artifact)">{{ t('openReader') }}</button>
         <button class="text-button danger" @click="removeVersion(artifact)">{{ t('deleteVersion') }}</button>
       </div>
     </details>
-    <ArtifactEditor v-if="editing" :key="editing.id" :record="editing" @close="editingID = ''" @saved="editingID = $event.id" />
+    <StructuredEditor v-if="editing && ['C', 'D', 'S'].includes(editing.data.type)" :key="editing.id" :record="editing" @close="editingID = ''" @saved="editingID = $event.id" />
+    <ArtifactEditor v-else-if="editing" :key="editing.id" :record="editing" @close="editingID = ''" @saved="editingID = $event.id" />
   </section>
 </template>
