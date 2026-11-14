@@ -7,6 +7,8 @@ const props = defineProps<{
   page: Block
   spec?: TemplateSpec
   selected?: Set<string>
+  /** The block being edited, outlined like Paper2Lab's selected box. */
+  editingIndex?: number
   interactive?: boolean
 }>()
 const emit = defineEmits<{ select: [index: number, additive: boolean] }>()
@@ -51,7 +53,7 @@ function imageURL(block: Block) {
     <section
       v-if="heading"
       class="slide-title slide-element"
-      :class="{ 'is-selected': heading.id && selected?.has(heading.id) }"
+      :class="{ 'is-selected': heading.id && selected?.has(heading.id), 'is-editing': interactive && editingIndex === title }"
       :data-slide-block-id="heading.id"
       :role="interactive ? 'button' : undefined"
       :tabindex="interactive ? 0 : undefined"
@@ -69,7 +71,7 @@ function imageURL(block: Block) {
         v-for="{ block, index } in content"
         :key="block.id ?? index"
         class="slide-element slide-content"
-        :class="{ 'is-selected': block.id && selected?.has(block.id), 'is-image': block.kind === 'image' }"
+        :class="{ 'is-selected': block.id && selected?.has(block.id), 'is-editing': interactive && editingIndex === index, 'is-image': block.kind === 'image' }"
         :data-slide-block-id="block.id"
         :role="interactive ? 'button' : undefined"
         :tabindex="interactive ? 0 : undefined"

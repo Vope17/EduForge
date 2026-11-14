@@ -170,6 +170,7 @@ onBeforeUnmount(() => { clearTimeout(timer); controller.abort() })
     >{{ t('slides.back') }}</RouterLink>
     <p
       v-if="busy"
+      class="busy-toast"
       role="status"
     >
       {{ t('documents.working') }}
@@ -199,13 +200,17 @@ onBeforeUnmount(() => { clearTimeout(timer); controller.abort() })
       {{ t('documents.refresh') }}
     </button>
     <template v-if="details">
-      <h1>{{ details.document?.content.title ?? details.request.topic }}</h1>
-      <p class="document-muted">
-        {{ t('slides.title') }} · {{ t(details.request.language === 'zh-TW' ? 'language.zhTW' : 'language.en') }} · {{ t('documents.states.' + details.request.state) }}
-      </p>
-      <p class="document-muted">
-        {{ t('documents.editor.aiNotice') }}
-      </p>
+      <header class="page-heading compact">
+        <div>
+          <p class="eyebrow">
+            {{ t('slides.title') }} · {{ t(details.request.language === 'zh-TW' ? 'language.zhTW' : 'language.en') }} · {{ t('documents.states.' + details.request.state) }}
+          </p>
+          <h1>{{ details.document?.content.title ?? details.request.topic }}</h1>
+          <p class="caption">
+            {{ t('documents.editor.aiNotice') }}
+          </p>
+        </div>
+      </header>
 
       <SlidesEditor
         v-if="details.document"
