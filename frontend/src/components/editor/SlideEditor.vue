@@ -4,6 +4,7 @@ import { useWorkspace } from '../../lib/workspace.ts'
 import { move } from '../../lib/i18n.ts'
 import { plainText } from '../../lib/markup.ts'
 import { TITLE_BOX, syncSlideFields, backgroundStyle, boxStyle, decorations, defaultLayout, rectStyle, slideKind, surfaceStyle, textStyle, themeOf, cqw } from '../../lib/slideTheme.ts'
+import { useMarquee } from '../../lib/marquee.ts'
 import FigurePicker from './FigurePicker.vue'
 import SlideText from './SlideText.vue'
 import SlideView from './SlideView.vue'
@@ -36,6 +37,10 @@ const { t } = useWorkspace()
 // The figure picker: replacing an image box's picture, or adding a new one.
 const current = ref(0), selected = ref(''), editing = ref(''), picking = ref<{ el: Element } | { add: true; el?: undefined } | null>(null)
 const canvas = ref<HTMLElement | null>(null)
+// Box selection: over the thumbnails it picks whole slides, over the slide it picks text boxes.
+const rail = ref<HTMLElement | null>(null), stage = ref<HTMLElement | null>(null)
+const railBox = useMarquee({ container: rail, items: '.slide-thumb-row', enabled: () => props.selectable, current: () => props.selection, commit: keys => emit('update:selection', keys), ignore: '.slide-rail-tools' })
+const stageBox = useMarquee({ container: stage, items: '.slide-box[data-kind="text"]', enabled: () => props.selectable, current: () => props.selection, commit: keys => emit('update:selection', keys), ignore: '.slide-box' })
 const slide = computed(() => props.slides[current.value])
 // Undo can remove slides: stay on one that exists.
 watch(() => props.slides.length, n => { if (current.value >= n) select(Math.max(0, n - 1)) })
@@ -176,8 +181,8 @@ const notesSeconds = computed(() => {
 
 <template>
   <div class="slide-editor">
-    <aside class="slide-rail" :aria-label="t('tabSlides')">
-      <div v-for="(s, i) in slides" :key="i" class="slide-thumb-row">
+    <aside ref="rail" class="slide-rail" :aria-label="t('tabSlides')">
+      <div v-for="(s, i) in slides" :key="i" class="slide-thumb-row" :data-select-key="`slide:${i}`">
         <button class="slide-thumb" :class="{ active: i === current, 'ai-selected': selectable && has(`slide:${i}`) }" @click="select(i)">
           <span class="slide-thumb-no">{{ i + 1 }}</span>
           <SlideView class="thumb" :slide="s" :theme="th" :url="url" :page="i + 1" :background="background" />
@@ -186,6 +191,7 @@ const notesSeconds = computed(() => {
           <input type="checkbox" :checked="has(`slide:${i}`)" :aria-label="t('selectSlideForAI') + ' · ' + (i + 1)" @change="toggleKey(`slide:${i}`)">
         </label>
       </div>
+      <div v-if="railBox.active" class="marquee" :style="{ left: railBox.x + 'px', top: railBox.y + 'px', width: railBox.w + 'px', height: railBox.h + 'px' }"></div>
       <div class="slide-rail-tools">
         <button class="secondary small" @click="addSlide"><Icon name="plus" /> {{ t('addSlide') }}</button>
       </div>
@@ -220,10 +226,11 @@ const notesSeconds = computed(() => {
         <button class="text-button danger" @click="removeSlide">{{ t('deleteSlide') }}</button>
       </div>
 
-      <div class="slide-stage" @pointerdown.self="selected = ''">
+      <div ref="stage" class="slide-stage" @pointerdown.self="selected = ''">
+        <div v-if="stageBox.active" class="marquee" :style="{ left: stageBox.x + 'px', top: stageBox.y + 'px', width: stageBox.w + 'px', height: stageBox.h + 'px' }"></div>
         <div ref="canvas" class="slide-surface" :style="{ ...surfaceStyle(th), ...backgroundStyle(th, kind, background), '--ratio': ratioNumber }" @pointerdown.self="selected = ''">
           <div v-for="(d, i) in decorations(th, kind)" :key="'d' + i" class="slide-decor" :style="rectStyle(d)" @pointerdown="selected = ''"></div>
-          <div v-for="el in slide.layout" :key="el.id" class="slide-box editable" :class="{ selected: selected === el.id, editing: editing === el.id, 'ai-selected': boxSelected(el) }"
+          <div v-for="el in slide.layout" :key="el.id" class="slide-box editable" :data-kind="el.kind" :data-select-key="`el:${current}:${el.id}`" :class="{ selected: selected === el.id, editing: editing === el.id, 'ai-selected': boxSelected(el) }"
             :style="boxStyle(el)" @pointerdown="startDrag($event, el, 'move')" @dblclick="edit(el)">
             <img v-if="el.kind === 'image'" :src="url(el.path ?? '')" :alt="captions[el.path ?? '']" draggable="false">
             <MathView v-else-if="el.kind === 'formula'" :tex="el.tex" :color="'#' + th.fg" :font-size="cqw(24, th)" />

@@ -140,7 +140,7 @@ async function reapply() {
           <template v-if="tab === 'edit'">
             <div class="editor-main">
               <SlideEditor v-if="type === 'B'" v-model:selection="selection" :selectable="aiOpen" :slides="sections" :images="images" :url="imageURL" :theme="theme" :background="(path: string) => fileURL(record, path)" />
-              <DocEditor v-else v-model:selection="selection" :selectable="aiOpen" :sections="sections" :images="images" :url="imageURL" :references="references" :title="documentTitle" :language="record.data.language" :kind="type as 'A' | 'C'" :look="record.data.style_snapshot?.resolved?.[type] || {}" />
+              <DocEditor v-else v-model:selection="selection" :selectable="aiOpen" :sections="sections" :images="images" :url="imageURL" :references="references" :title="documentTitle" :language="record.data.language" :look="record.data.style_snapshot?.resolved?.[type] || {}" />
             </div>
             <AIEditPanel v-if="aiOpen" :record="record" :sections="sections" :selection="selection" :geometry="geometry" @close="aiOpen = false" @clear="selection = []" />
           </template>

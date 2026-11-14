@@ -118,9 +118,9 @@ func documentKicker(a domain.Artifact) string {
 	switch a.Type {
 	case "A":
 		if zh {
-			return "論文導讀"
+			return "講義"
 		}
-		return "Lesson reading guide"
+		return "Handout"
 	case "B":
 		if zh {
 			return "簡報講稿"

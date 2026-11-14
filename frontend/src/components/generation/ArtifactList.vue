@@ -47,7 +47,7 @@ const older = computed(() => props.artifacts.filter(a => !latest.value.includes(
     <div class="artifact-grid">
       <article v-for="artifact in latest" :key="artifact.id" class="artifact-card">
         <div class="form-row">
-          <span class="output-letter small-letter">{{ artifact.data.type }}</span>
+          <span class="output-letter small-letter">{{ artifact.data.type === 'B' ? 'PPT' : 'DOC' }}</span>
         </div>
         <h3>{{ artifact.data.grouped_lesson_ids?.length ? artifact.data.grouped_lesson_ids.map(studyTitle).join(' / ') : t(artifact.data.type) }}</h3>
         <p class="caption">{{ artifact.data.language }} · v{{ artifact.version }} · {{ new Date(artifact.created_at).toLocaleString(state.language) }}</p>
@@ -68,7 +68,7 @@ const older = computed(() => props.artifacts.filter(a => !latest.value.includes(
     <details v-if="older.length">
       <summary>{{ t('olderVersions') }} <span class="count">{{ older.length }}</span></summary>
       <div v-for="artifact in older" :key="artifact.id" class="source-row">
-        <span class="file-icon">{{ artifact.data.type }}</span>
+        <span class="file-icon">{{ artifact.data.type === 'B' ? 'PPT' : 'DOC' }}</span>
         <div class="grow"><strong>{{ t(artifact.data.type) }}</strong><small>{{ artifact.data.language }} · v{{ artifact.version }} · {{ new Date(artifact.created_at).toLocaleString(state.language) }}</small></div>
         <button class="text-button" @click="open(artifact)">{{ t('openReader') }}</button>
         <button class="text-button danger" @click="removeVersion(artifact)">{{ t('deleteVersion') }}</button>

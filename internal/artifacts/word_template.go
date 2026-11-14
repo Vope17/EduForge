@@ -168,15 +168,15 @@ func InspectWordTemplate(ctx context.Context, s *store.Store, file string) (doma
 
 func renderWordPreview(ctx context.Context, s *store.Store, file string, t *domain.Template) error {
 	blocks := []wordBlock{
-		{Kind: "subtitle", Text: "論文導讀 · Lesson reading guide"},
-		{Kind: "title", Text: "論文題目 Lesson title"},
-		{Kind: "h1", Text: "I.  研究動機與問題"},
-		{Kind: "para", Text: "這裡是讀本內文，會套用模板的內文樣式、字型與段落設定。The reader's text uses the template's body style."},
+		{Kind: "subtitle", Text: "講義 · Handout"},
+		{Kind: "title", Text: "課次名稱 Lesson title"},
+		{Kind: "h1", Text: "I.  本節重點"},
+		{Kind: "para", Text: "這裡是講義內文，會套用模板的內文樣式、字型與段落設定。The handout's text uses the template's body style."},
 		{Kind: "bullet", Text: "重點一：模板的標題與內文樣式"},
 		{Kind: "bullet", Text: "重點二：保留頁首、頁尾與頁面設定"},
 		{Kind: "h2", Text: "小標題 Subheading"},
-		{Kind: "para", Text: "論文原圖會置中插入，下方加上原圖說。"},
-		{Kind: "h1", Text: "II.  方法"},
+		{Kind: "para", Text: "教材原圖會置中插入，下方加上原圖說。"},
+		{Kind: "h1", Text: "II.  概念講解"},
 		{Kind: "para", Text: "……"},
 	}
 	b, err := buildWordDocument(file, blocks)

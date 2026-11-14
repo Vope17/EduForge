@@ -110,9 +110,9 @@ type deckWords struct{ kicker, closing, thanks, opening, ending, figure string }
 
 func deckLabels(lang string) deckWords {
 	if lang == "zh-TW" {
-		return deckWords{"論文導讀", "Q & A", "謝謝聆聽", "大家好，今天要和大家分享的論文是〈%s〉。接下來會依序說明研究動機、方法、實驗結果與限制。", "以上就是這篇論文的重點整理。謝謝大家，歡迎提問與討論。", "請看這張圖。"}
+		return deckWords{"課堂簡報", "Q & A", "謝謝大家", "大家好，今天的課程是〈%s〉。接下來依序說明本節的學習目標、重要概念與例題。", "以上就是這一節的重點整理。謝謝大家，歡迎提問與討論。", "請看這張圖。"}
 	}
-	return deckWords{"Lesson reading", "Q & A", "Thank you", "Hello everyone. Today I will present “%s”, covering its motivation, method, results and limitations.", "That concludes the main points of this lesson. Thank you, and I am happy to take questions.", "Let us look at this figure."}
+	return deckWords{"Class slides", "Q & A", "Thank you", "Hello everyone. Today’s lesson is “%s”. We will go through its learning objectives, key concepts and worked examples.", "That concludes the main points of this lesson. Thank you, and I am happy to take questions.", "Let us look at this figure."}
 }
 
 // Slide geometry (fractions of the slide).

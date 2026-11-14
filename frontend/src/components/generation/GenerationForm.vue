@@ -3,6 +3,8 @@ import { computed, reactive, watch } from 'vue'
 import { useWorkspace } from '../../lib/workspace.ts'
 import ConnectionNotice from './ConnectionNotice.vue'
 import TemplatePicker from '../editor/TemplatePicker.vue'
+import { chapterList } from '../../lib/library.ts'
+import { effectiveSettings } from '../../lib/settings.ts'
 import type { Rec, Request } from '../../api/types.ts'
 
 const props = defineProps<{ lessonIds: string[] }>()
@@ -10,7 +12,7 @@ const emit = defineEmits<{ started: [requestID: string] }>()
 const { state, t, api, act, explain } = useWorkspace()
 const form = reactive({
   selected: ['A'], use_lesson_settings: false, languages: { A: '', B: '' }, profile_id: '',
-  settings: { depth: 'standard', level: 'intermediate', audience: 'classmates', minutes: 10, template_id: '', reader_template_id: '', languages: {} as Record<string, string>, instructions: { A: '', B: '' } as Record<string, string> },
+  settings: { depth: 'standard', level: 'intermediate', audience: '', minutes: 50, template_id: '', reader_template_id: '', languages: {} as Record<string, string>, instructions: { A: '', B: '' } as Record<string, string> },
   overrides: { A: {}, B: {} },
 })
 const lessons = computed(() => (state.snapshot.lesson || []).filter(p => props.lessonIds.includes(p.id)))
@@ -20,8 +22,15 @@ const activeKinds = computed(() => form.use_lesson_settings ? savedKinds.value :
 const unconfirmed = computed(() => lessons.value.filter(p => !(state.snapshot.knowledge || []).find(k => k.id === p.data.knowledge_id)?.data.confirmed))
 const has = (kind: string) => !form.use_lesson_settings && form.selected.includes(kind)
 
-// Start from the single lesson's saved settings when it has them.
+// Start from what the lesson inherits (course defaults, then its chapter, then
+// itself), then from the settings it saved with its outputs, if any.
 watch(single, lesson => {
+  if (lesson) {
+    const chapter = chapterList(state.snapshot).find(c => c.id === lesson.data.chapter)
+    const base = effectiveSettings(state.snapshot.course?.data.settings, chapter?.data.settings, lesson.data.settings)
+    for (const key of ['depth', 'level', 'audience', 'minutes', 'template_id', 'reader_template_id'] as const) if (base[key]) Object.assign(form.settings, { [key]: base[key] })
+    Object.assign(form.settings.instructions, { A: '', B: '' }, base.instructions || {})
+  }
   const saved = lesson?.data.settings
   if (!saved?.selected?.length) return
   form.selected = [...saved.selected]
@@ -72,7 +81,6 @@ async function saveStudySettings() {
     <div v-if="!form.use_lesson_settings" class="output-choices">
       <label v-for="kind in ['A', 'B']" :key="kind" class="output-choice" :class="{ chosen: form.selected.includes(kind) }">
         <input v-model="form.selected" type="checkbox" :value="kind">
-        <span class="output-letter">{{ kind }}</span>
         <strong>{{ t(kind) }}</strong>
         <select v-model="form.languages[kind]" :aria-label="t('outputLanguage')">
           <option value="">{{ t('followUI') }}</option>
@@ -86,11 +94,11 @@ async function saveStudySettings() {
       <label v-if="has('A')">{{ t('depth') }}
         <select v-model="form.settings.depth"><option v-for="v in ['brief', 'standard', 'deep']" :key="v" :value="v">{{ t(v) }}</option></select>
       </label>
-      <label v-if="has('A')">{{ t('level') }}
-        <select v-model="form.settings.level"><option v-for="v in ['beginner', 'intermediate', 'advanced']" :key="v" :value="v">{{ t(v) }}</option></select>
+      <label v-if="has('A') || has('B')">{{ t('level') }}
+        <select v-model="form.settings.level"><option v-for="v in ['beginner', 'intermediate', 'advanced']" :key="v" :value="v">{{ t('level_' + v) }}</option></select>
       </label>
-      <label v-if="has('B')">{{ t('audience') }}
-        <select v-model="form.settings.audience"><option v-for="v in ['classmates', 'advisor', 'crossField']" :key="v" :value="v">{{ t(v) }}</option></select>
+      <label v-if="has('A') || has('B')">{{ t('audience') }}
+        <input v-model="form.settings.audience" :placeholder="t('settingsAudiencePlaceholder')" maxlength="200">
       </label>
       <label v-if="has('B')">{{ t('minutes') }}<input v-model.number="form.settings.minutes" type="number" min="1" max="180"></label>
     </div>

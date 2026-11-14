@@ -164,7 +164,7 @@ func TestReaderHasCaptionsAndReferencesButNoGlossaryOrSourceIndex(t *testing.T) 
 			t.Fatalf("reader still contains %q", bad)
 		}
 	}
-	if !strings.Contains(html, `<span class="num">I.</span>方法`) || !strings.Contains(html, "論文導讀") {
+	if !strings.Contains(html, `<span class="num">I.</span>方法`) || !strings.Contains(html, "講義") {
 		t.Fatal("reader sections should be numbered under a titled header")
 	}
 	if !strings.Contains(html, "<h2>引用</h2><ol><li>AIDA lesson</li>") {

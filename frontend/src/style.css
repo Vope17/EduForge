@@ -1154,3 +1154,8 @@ button.citation.on { background: var(--brand); color: #fff }
 .pill.vision { color: #6b3fa0; background: #f1eafa; border-color: #d9c8ee }
 .knowledge-detail { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 0; font-size: 13px; color: var(--ink-2) }
 .knowledge-detail textarea { width: 100% }
+
+/* Box selection */
+.doc-editor, .slide-rail, .slide-stage { position: relative }
+.marquee { position: absolute; z-index: 30; border: 1px solid var(--brand); background: #0f5f5222; border-radius: 3px; pointer-events: none }
+.doc-editor.marqueeing { user-select: none }

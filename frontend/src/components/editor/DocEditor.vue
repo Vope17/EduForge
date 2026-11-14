@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useMarquee } from '../../lib/marquee.ts'
 import { useWorkspace } from '../../lib/workspace.ts'
 import { move } from '../../lib/i18n.ts'
 import { formulaChip, roman, sectionFigures, sectionTitle } from '../../lib/markup.ts'
@@ -17,14 +18,12 @@ const props = withDefaults(defineProps<{
   references?: string[]
   title?: string
   language?: string
-  /** A reader, C reproduction plan. */
-  kind?: 'A' | 'C'
   /** A Word template's fonts and colours. */
   look?: Style
   /** AI editing: selected sec:<i> keys. */
   selection?: string[]
   selectable?: boolean
-}>(), { references: () => [], title: '', language: 'zh-TW', kind: 'A', look: () => ({}), selection: () => [], selectable: false })
+}>(), { references: () => [], title: '', language: 'zh-TW', look: () => ({}), selection: () => [], selectable: false })
 const emit = defineEmits<{ 'update:selection': [keys: string[]] }>()
 const isSelected = (i: number) => props.selection.includes(`sec:${i}`)
 function toggleSelect(i: number) {
@@ -32,6 +31,9 @@ function toggleSelect(i: number) {
   emit('update:selection', isSelected(i) ? props.selection.filter(k => k !== key) : [...props.selection, key])
 }
 const { t } = useWorkspace()
+// Dragging over empty space selects the sections the box touches.
+const root = ref<HTMLElement | null>(null)
+const marquee = useMarquee({ container: root, items: '.doc-section', enabled: () => props.selectable, current: () => props.selection, commit: keys => emit('update:selection', keys), ignore: '.doc-toolbar, .doc-section-tools', listenOn: () => root.value?.closest<HTMLElement>('.editor-main') ?? root.value })
 // The figure being chosen: index null appends one.
 const picking = ref<{ section: number; index: number | null } | null>(null)
 const hex = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{6}$/i.test(v) ? '#' + v : null
@@ -82,7 +84,7 @@ function pick(path: string) {
 </script>
 
 <template>
-  <div class="doc-editor">
+  <div ref="root" class="doc-editor" :class="{ marqueeing: marquee.active }">
     <div class="doc-toolbar" role="toolbar" :aria-label="t('formatting')">
       <button class="tool" :title="t('bold')" @mousedown.prevent="command('bold')"><b>B</b></button>
       <button class="tool" :title="t('subheading')" @mousedown.prevent="toggleSubheading">H</button>
@@ -94,10 +96,10 @@ function pick(path: string) {
 
     <article class="doc-page" :style="pageStyle">
       <header v-if="title" class="doc-title">
-        <p class="doc-kicker">{{ kind === 'C' ? (language === 'zh-TW' ? '實驗復現規劃書' : 'Experiment reproduction plan') : (language === 'zh-TW' ? '論文導讀' : 'Lesson reading guide') }}</p>
+        <p class="doc-kicker">{{ language === 'zh-TW' ? '講義' : 'Handout' }}</p>
         <h1>{{ title }}</h1>
       </header>
-      <section v-for="(sec, i) in sections" :key="i" class="doc-section" :class="{ 'ai-selected': selectable && isSelected(i) }">
+      <section v-for="(sec, i) in sections" :key="i" class="doc-section" :data-select-key="`sec:${i}`" :class="{ 'ai-selected': selectable && isSelected(i) }">
         <label v-if="selectable" class="ai-select doc-select" :title="t('selectForAI')">
           <input type="checkbox" :checked="isSelected(i)" :aria-label="t('selectForAI') + ' · ' + roman(i + 1)" @change="toggleSelect(i)">
         </label>
@@ -119,6 +121,7 @@ function pick(path: string) {
         <ol><li v-for="name in references" :key="name">{{ name }}</li></ol>
       </section>
     </article>
+    <div v-if="marquee.active" class="marquee" :style="{ left: marquee.x + 'px', top: marquee.y + 'px', width: marquee.w + 'px', height: marquee.h + 'px' }"></div>
     <FigurePicker v-if="picking" :images="images" :url="url" @pick="pick" @close="picking = null" />
   </div>
 </template>

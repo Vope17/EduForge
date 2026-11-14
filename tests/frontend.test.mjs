@@ -150,3 +150,19 @@ test('settings inherit course, then chapter, then lesson; empty fields never bla
   assert.deepEqual(merged.instructions, { A: 'plain', B: 'brief' })
   assert.equal(effectiveSettings(course, {}, {}).minutes, 90)
 })
+
+test('box selection touches what the rectangle overlaps, and adds only when asked', async () => {
+  const { marqueeKeys, combine } = await import('../frontend/src/lib/marquee.ts')
+  const rect = (left, top, right, bottom) => ({ left, top, right, bottom })
+  const items = [
+    { key: 'sec:0', rect: rect(100, 0, 500, 100) },
+    { key: 'sec:1', rect: rect(100, 110, 500, 210) },
+    { key: 'sec:2', rect: rect(100, 220, 500, 320) },
+  ]
+  assert.deepEqual(marqueeKeys(rect(0, 90, 50, 130), items), [], 'a box left of the page touches nothing')
+  assert.deepEqual(marqueeKeys(rect(20, 90, 140, 130), items), ['sec:0', 'sec:1'], 'a box reaching into two sections selects both')
+  assert.deepEqual(marqueeKeys(rect(500, 0, 600, 400), items), [], 'touching only an edge is not overlapping')
+  assert.deepEqual(marqueeKeys(rect(0, 0, 600, 400), items), ['sec:0', 'sec:1', 'sec:2'])
+  assert.deepEqual(combine(['sec:2'], ['sec:0'], false), ['sec:0'])
+  assert.deepEqual(combine(['sec:2'], ['sec:0', 'sec:2'], true), ['sec:2', 'sec:0'])
+})
