@@ -90,7 +90,9 @@ func serve(args []string) error {
 	defer stop()
 	application.Start(ctx)
 	defer application.Stop()
-	server := httpapi.HTTPServer(httpapi.New(application, *web, httpapi.DefaultOrigins(*listen)), *listen)
+	api := httpapi.New(application, *web, httpapi.DefaultOrigins(*listen))
+	api.FrameAncestors = httpapi.FrameAncestors()
+	server := httpapi.HTTPServer(api, *listen)
 	go func() {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 15*time.Second)

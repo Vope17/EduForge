@@ -52,3 +52,42 @@ func TestClientCannotAssignAnOwner(t *testing.T) {
 		t.Fatalf("client ownership accepted: %d", rec.Code)
 	}
 }
+
+func TestFramingIsDeniedUnlessAncestorsAreConfigured(t *testing.T) {
+	s := handler(t)
+	get := func() http.Header {
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://localhost:8080/api/health", nil))
+		return rec.Header()
+	}
+	if h := get(); h.Get("X-Frame-Options") != "DENY" || h.Get("Content-Security-Policy") != "frame-ancestors 'none'" {
+		t.Fatalf("default framing headers: %v", h)
+	}
+	s.FrameAncestors = "http://127.0.0.1:8090"
+	if h := get(); h.Get("X-Frame-Options") != "" || h.Get("Content-Security-Policy") != "frame-ancestors http://127.0.0.1:8090" {
+		t.Fatalf("portal framing headers: %v", h)
+	}
+}
+
+func TestPreviewFramesAllowThePortalAncestor(t *testing.T) {
+	s := handler(t)
+	h := http.Header{}
+	s.previewHeaders(h, "sandbox; default-src 'none'")
+	if h.Get("X-Frame-Options") != "SAMEORIGIN" || h.Get("Content-Security-Policy") != "sandbox; default-src 'none'; frame-ancestors 'self'" {
+		t.Fatalf("default preview headers: %v", h)
+	}
+	s.FrameAncestors = "http://127.0.0.1:8090 http://localhost:8090"
+	h = http.Header{"X-Frame-Options": {"DENY"}}
+	s.previewHeaders(h, "sandbox; default-src 'none'")
+	if h.Get("X-Frame-Options") != "" ||
+		h.Get("Content-Security-Policy") != "sandbox; default-src 'none'; frame-ancestors 'self' http://127.0.0.1:8090 http://localhost:8090" {
+		t.Fatalf("portal preview headers: %v", h)
+	}
+}
+
+func TestFrameAncestorsKeepsOnlyPlainOrigins(t *testing.T) {
+	t.Setenv("EDUFORGE_FRAME_ANCESTORS", "http://127.0.0.1:8090  https://portal.example/ 'self' * http://a;b ftp://x http://x/path http://u@x javascript:alert(1)")
+	if got := FrameAncestors(); got != "http://127.0.0.1:8090 https://portal.example" {
+		t.Fatalf("got %q", got)
+	}
+}

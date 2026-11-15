@@ -32,6 +32,9 @@ type Server struct {
 	Web     string
 	Origins map[string]bool
 	Hosts   map[string]bool
+	// FrameAncestors lists the origins (space-separated) allowed to show EduForge in a frame, such as the iLearn
+	// portal. Empty means no page may frame it.
+	FrameAncestors string
 }
 
 func New(a *app.App, web string, origins []string) *Server {
@@ -53,7 +56,12 @@ func owner(r *http.Request) string {
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "same-origin")
-	w.Header().Set("X-Frame-Options", "DENY")
+	if s.FrameAncestors == "" {
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
+	} else {
+		w.Header().Set("Content-Security-Policy", "frame-ancestors "+s.FrameAncestors)
+	}
 	if !s.Hosts[r.Host] {
 		writeError(w, errors.New("invalid_host"), http.StatusForbidden)
 		return
@@ -709,8 +717,7 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) error {
 		if format == "html" && r.URL.Query().Get("preview") == "true" {
 			w.Header().Set("Content-Type", typ)
 			w.Header().Set("Cache-Control", "no-store")
-			w.Header().Set("X-Frame-Options", "SAMEORIGIN")
-			w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'")
+			s.previewHeaders(w.Header(), "sandbox; default-src 'none'; style-src 'unsafe-inline'")
 			_, _ = w.Write(b)
 			return nil
 		}
@@ -754,8 +761,7 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) error {
 	if format == "html" && r.URL.Query().Get("preview") == "true" {
 		w.Header().Set("Content-Type", typ)
 		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
-		w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'self'")
+		s.previewHeaders(w.Header(), "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:")
 		_, _ = w.Write(b)
 		return nil
 	}
@@ -832,6 +838,34 @@ func (s *Server) static(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.ServeFile(w, r, index)
+}
+
+// previewHeaders sandboxes an HTML preview shown in EduForge's own iframe with the given policy. frame-ancestors is
+// checked against every ancestor, so the portal that frames EduForge has to be allowed here too.
+func (s *Server) previewHeaders(h http.Header, policy string) {
+	ancestors := "'self'"
+	if s.FrameAncestors == "" {
+		h.Set("X-Frame-Options", "SAMEORIGIN")
+	} else {
+		h.Del("X-Frame-Options")
+		ancestors += " " + s.FrameAncestors
+	}
+	h.Set("Content-Security-Policy", policy+"; frame-ancestors "+ancestors)
+}
+
+// FrameAncestors reads EDUFORGE_FRAME_ANCESTORS: space-separated http(s) origins allowed to frame EduForge. Entries
+// that are not plain origins (paths, quotes, wildcards, separators) are dropped so they cannot alter the header.
+func FrameAncestors() string {
+	var out []string
+	for _, field := range strings.Fields(os.Getenv("EDUFORGE_FRAME_ANCESTORS")) {
+		u, err := url.Parse(field)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil ||
+			(u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" || strings.ContainsAny(field, ";,'\"*") {
+			continue
+		}
+		out = append(out, u.Scheme+"://"+u.Host)
+	}
+	return strings.Join(out, " ")
 }
 
 func DefaultOrigins(listen string) []string {
