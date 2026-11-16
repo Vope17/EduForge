@@ -172,6 +172,9 @@ export function createWorkspace() {
     }
     return id
   }
+  // Knowledge or an output written when other lessons came before its lesson.
+  const changedSet = computed(() => new Set(state.snapshot.background_changed || []))
+  const backgroundChanged = (id: string | undefined) => !!id && changedSet.value.has(id)
   const explain = (code: string) => errorText(code, state.language)
   // Without an explicit step, open the step that needs attention next.
   function openLesson(id: string, step?: Step) {
@@ -181,7 +184,7 @@ export function createWorkspace() {
 
   const workspace = {
     state, route, go, t: tr, api, refresh, act, init, setLanguage, notify, fileURL, lesson, knowledge,
-    citationLabel, explain, providers, loadModels, checkConnections, openLesson,
+    citationLabel, explain, backgroundChanged, providers, loadModels, checkConnections, openLesson,
   }
   provide(key, workspace)
   return workspace

@@ -6,7 +6,7 @@ import StructuredEditor from '../StructuredEditor.vue'
 import type { Artifact, Rec } from '../../api/types.ts'
 
 const props = defineProps<{ artifacts: Rec<Artifact>[] }>()
-const { state, t, api, act } = useWorkspace()
+const { state, t, api, act, backgroundChanged } = useWorkspace()
 const editingID = ref('')
 const editing = computed(() => (state.snapshot.artifact || []).find(x => x.id === editingID.value))
 function open(artifact: Rec<Artifact>) { editingID.value = artifact.id }
@@ -53,6 +53,7 @@ const older = computed(() => props.artifacts.filter(a => !latest.value.includes(
         <h3>{{ artifact.data.grouped_lesson_ids?.length ? artifact.data.grouped_lesson_ids.map(studyTitle).join(' / ') : t(artifact.data.type) }}</h3>
         <p class="caption">{{ artifact.data.language }} · v{{ artifact.version }} · {{ new Date(artifact.created_at).toLocaleString(state.language) }}</p>
         <p v-if="artifact.data.mode === 'source-extract'" class="draft-notice">{{ t('extractive') }}</p>
+        <p v-if="backgroundChanged(artifact.id)"><span class="pill warning" :title="t('backgroundChangedHint')">{{ t('backgroundChanged') }}</span></p>
         <p v-if="artifact.data.type === 'B'" class="caption">{{ t('estimatedTime') }}: {{ artifact.data.estimated_minutes?.toFixed(1) }} min</p>
         <div class="button-row">
           <button class="primary small" @click="open(artifact)">{{ t('openReader') }}</button>

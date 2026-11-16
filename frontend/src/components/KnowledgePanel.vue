@@ -9,7 +9,7 @@ import type { Knowledge, Unit } from '../api/types.ts'
 // section (written by AI after reading every source page when a model is
 // connected, otherwise excerpts of the source) and key terms. The coverage
 // banner says how much of the sources was read.
-const { state, t, api, act, knowledge, fileURL, citationLabel, explain } = useWorkspace()
+const { state, t, api, act, knowledge, fileURL, citationLabel, explain, backgroundChanged } = useWorkspace()
 const draft = ref<Knowledge | null>(null), version = ref(0), loaded = ref('')
 // The source passage shown under a point: "<claim index>:<unit id>".
 const open = ref('')
@@ -81,6 +81,7 @@ const rows = (text: string | undefined) => Math.min(8, Math.max(2, Math.ceil((te
           <button type="button" class="secondary small" :disabled="!modelReady || writing || !!state.busy" @click="rewrite(true)">{{ t('coverageResume') }}</button>
         </template>
         <span v-else class="pill success">{{ t('coverageComplete') }}</span>
+        <span v-if="backgroundChanged(knowledge?.id)" class="pill warning" :title="t('backgroundChangedHint')">{{ t('backgroundChanged') }}</span>
       </div>
 
       <div class="knowledge-sections">

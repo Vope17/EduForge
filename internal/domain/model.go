@@ -189,6 +189,18 @@ type Knowledge struct {
 	// Coverage says how much of the sources a model read when it wrote this
 	// knowledge. Nil for rule-based excerpts and for knowledge a person wrote.
 	Coverage *Coverage `json:"coverage,omitempty"`
+	// Background is what the model was told the students already knew when
+	// it read the sources. Nil when no model read them.
+	Background *Background `json:"background,omitempty"`
+}
+
+// Background records the lessons taught before a lesson at the time its
+// knowledge or an output was written: their concepts went into the prompt as
+// "already taught". When the teaching order later changes, the record no
+// longer matches and the knowledge or output is reported as having a changed
+// background (App.BackgroundChanged); it is not regenerated automatically.
+type Background struct {
+	Lessons []string `json:"lesson_ids"`
 }
 
 // Coverage records how completely a model read the source pages: every page
@@ -291,10 +303,12 @@ type Task struct {
 	Settings         OutputSettings `json:"settings"`
 	Style            StyleSnapshot  `json:"style_snapshot"`
 	ReadTerms        []string       `json:"read_terms"`
-	Error            string         `json:"error,omitempty"`
-	ResultID         string         `json:"result_id,omitempty"`
-	Completed        int            `json:"completed"`
-	Total            int            `json:"total"`
+	// Background is the lessons whose concepts are in ReadTerms.
+	Background *Background `json:"background,omitempty"`
+	Error      string      `json:"error,omitempty"`
+	ResultID   string      `json:"result_id,omitempty"`
+	Completed  int         `json:"completed"`
+	Total      int         `json:"total"`
 	// MissedOnly makes a knowledge task read only the pages a previous read
 	// missed, and add to the existing knowledge.
 	MissedOnly bool `json:"missed_only,omitempty"`
@@ -381,6 +395,10 @@ type Artifact struct {
 	Previous         string      `json:"previous_id,omitempty"`
 	EstimatedMinutes float64     `json:"estimated_minutes"`
 	CreatedFrom      string      `json:"created_from,omitempty"`
+	// Background is the lessons taught before this output's lesson when it
+	// was generated. Nil for the course syllabus and for outputs generated
+	// before backgrounds were recorded.
+	Background *Background `json:"background,omitempty"`
 }
 
 // PlanInfo is the lesson plan's basic data.

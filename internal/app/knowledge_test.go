@@ -163,8 +163,12 @@ func TestEarlierLessonsAreBackgroundForLaterOnes(t *testing.T) {
 	second = lessonWithPages(t, a, owner, second, 2)
 	_, k := knowledgeOf(t, a, owner, second)
 	prompts := batchModel(t, a, owner, 0)
-	if _, err := a.writeKnowledge(ctx, owner, second.ID, k, nil, readControl{}); err != nil {
+	written, err := a.writeKnowledge(ctx, owner, second.ID, k, nil, readControl{})
+	if err != nil {
 		t.Fatal(err)
+	}
+	if written.Background == nil || len(written.Background.Lessons) != 1 || written.Background.Lessons[0] != first.ID {
+		t.Fatalf("the read records the lessons before it: %+v", written.Background)
 	}
 	if !strings.Contains((*prompts)[0], "- eigenvector") || !strings.Contains((*prompts)[0], "Do not explain them again") {
 		t.Fatalf("the earlier lesson's concepts are background:\n%s", (*prompts)[0])

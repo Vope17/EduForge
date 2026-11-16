@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/png"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -220,6 +221,85 @@ func TestEarlierLessonsAreBackgroundInHandoutsAndSlides(t *testing.T) {
 				t.Fatalf("the audience is stated in the teacher's words:\n%s", prompt)
 			}
 		}
+	}
+}
+
+func TestOutputsReportWhenTheLessonsBeforeThemChange(t *testing.T) {
+	ctx := context.Background()
+	a, owner, course, first := fixture(t)
+	second := newLesson(t, a, owner, course.ID, "Second lesson")
+	second = lessonWithPages(t, a, owner, second, 2)
+	sp, _ := domain.Decode[domain.Lesson](second.Data)
+	if _, err := set[domain.Knowledge](ctx, a, owner, sp.KnowledgeID, 0, func(k *domain.Knowledge) error {
+		k.Confirmed = true
+		k.Claims = []domain.Claim{{Section: 2, Text: "A concept", Citations: []string{k.Units[0].ID}, Verified: true, Kind: "ai_summary"}}
+		k.Background = &domain.Background{Lessons: []string{first.ID}}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cite := lessonUnit(t, a, owner, second)
+	useFakeModel(t, a, owner, func(string) string { return `{"title":"T","body":"B","citations":["` + cite + `"]}` })
+	output := map[string]string{}
+	for _, lesson := range []domain.Record{first, second} {
+		req, err := a.CreateRequest(ctx, owner, course.ID, domain.Request{LessonIDs: []string{lesson.ID}, Selected: []string{"A"}, Languages: map[string]string{"A": "en"}, UILanguage: "en", Unlimited: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		tasks, err := a.StartRequest(ctx, owner, req.ID, "en", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = a.process(ctx, owner, tasks[0].ID); err != nil {
+			t.Fatal(err)
+		}
+		task := mustGet(t, a, owner, tasks[0].ID)
+		tk, _ := domain.Decode[domain.Task](task.Data)
+		output[lesson.ID] = tk.ResultID
+	}
+	art, _ := domain.Decode[domain.Artifact](mustGet(t, a, owner, output[second.ID]).Data)
+	if art.Background == nil || len(art.Background.Lessons) != 1 || art.Background.Lessons[0] != first.ID {
+		t.Fatalf("the output records the lessons before it: %+v", art.Background)
+	}
+	changed := func() []string {
+		ids, err := a.BackgroundChanged(ctx, owner, course.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		slices.Sort(ids)
+		return ids
+	}
+	if got := changed(); len(got) != 0 {
+		t.Fatalf("nothing moved, nothing changed: %v", got)
+	}
+	// An output from before backgrounds were recorded is never reported.
+	legacy, err := a.create(ctx, owner, "artifact", second.ID, course.ID, second.ID, domain.Artifact{Type: "A", KnowledgeID: sp.KnowledgeID, Sections: []domain.Section{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Teach the second lesson first: both lessons' outputs and the second
+	// lesson's knowledge now assume the wrong background.
+	if err := a.ReorderCourse(ctx, owner, course.ID, CourseOrder{Groups: []LessonGroup{{Chapter: "", Lessons: []string{second.ID, first.ID}}}}); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{output[first.ID], output[second.ID], sp.KnowledgeID}
+	slices.Sort(want)
+	if got := changed(); !slices.Equal(got, want) || slices.Contains(got, legacy.ID) {
+		t.Fatalf("changed = %v, want %v", got, want)
+	}
+	// Moving it back restores the recorded background.
+	if err := a.ReorderCourse(ctx, owner, course.ID, CourseOrder{Groups: []LessonGroup{{Chapter: "", Lessons: []string{first.ID, second.ID}}}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := changed(); len(got) != 0 {
+		t.Fatalf("restored order, nothing changed: %v", got)
+	}
+	summary, err := a.Summary(ctx, owner, course.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := summary["background_changed"]; !ok {
+		t.Fatal("the summary carries the changed records")
 	}
 }
 

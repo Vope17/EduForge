@@ -193,6 +193,22 @@ export interface Knowledge {
    * knowledge. Nil for rule-based excerpts and for knowledge a person wrote.
    */
   coverage?: Coverage
+  /**
+   * Background is what the model was told the students already knew when
+   * it read the sources. Nil when no model read them.
+   */
+  background?: Background
+}
+
+/**
+ * Background records the lessons taught before a lesson at the time its
+ * knowledge or an output was written: their concepts went into the prompt as
+ * "already taught". When the teaching order later changes, the record no
+ * longer matches and the knowledge or output is reported as having a changed
+ * background (App.BackgroundChanged); it is not regenerated automatically.
+ */
+export interface Background {
+  lesson_ids: string[] | null
 }
 
 /**
@@ -305,6 +321,8 @@ export interface Task {
   settings: OutputSettings
   style_snapshot: StyleSnapshot
   read_terms: string[] | null
+  /** Background is the lessons whose concepts are in ReadTerms. */
+  background?: Background
   error?: string
   result_id?: string
   completed: number
@@ -413,6 +431,12 @@ export interface Artifact {
   previous_id?: string
   estimated_minutes: number
   created_from?: string
+  /**
+   * Background is the lessons taught before this output's lesson when it
+   * was generated. Nil for the course syllabus and for outputs generated
+   * before backgrounds were recorded.
+   */
+  background?: Background
 }
 
 /** PlanInfo is the lesson plan's basic data. */

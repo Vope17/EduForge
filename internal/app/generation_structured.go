@@ -39,7 +39,7 @@ func (a *App) writeStructured(ctx context.Context, owner, id string, task domain
 	if err != nil {
 		return err
 	}
-	art := domain.Artifact{Type: kind, Language: t.Language, KnowledgeID: t.KnowledgeID, RequestID: t.RequestID, TaskID: id, Style: t.Style, Settings: t.Settings, Sections: []domain.Section{}, Mode: "model"}
+	art := domain.Artifact{Type: kind, Language: t.Language, KnowledgeID: t.KnowledgeID, RequestID: t.RequestID, TaskID: id, Style: t.Style, Settings: t.Settings, Sections: []domain.Section{}, Mode: "model", Background: t.Background}
 	info := domain.PlanInfo{Unit: l.Title, Audience: t.Settings.Audience, Minutes: t.Settings.Minutes, Source: a.lessonSource(ctx, owner, lesson)}
 	var provider string
 	switch kind {

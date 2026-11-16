@@ -182,6 +182,13 @@ func (a *App) writeKnowledge(ctx context.Context, owner, lessonID string, k doma
 		out.Issues = append(out.Issues, domain.Issue{Code: "coverage_incomplete", Detail: fmt.Sprintf("%d/%d", out.Coverage.Read, out.Coverage.Pages)})
 	}
 	out.Language = lang
+	// A full read replaces everything, so it records today's background. A
+	// read of missed pages adds to knowledge written earlier and keeps that
+	// knowledge's record unless it has none.
+	out.Background = k.Background
+	if only == nil || out.Background == nil {
+		out.Background = a.backgroundOf(ctx, owner, lessonID)
+	}
 	return out, nil
 }
 

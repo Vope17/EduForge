@@ -302,6 +302,7 @@ func (a *App) SaveKnowledge(ctx context.Context, owner, lessonID string, expecte
 	k.Issues = issues
 	k.Edits = oldK.Edits + 1
 	k.Author, k.Language, k.AIError = oldK.Author, oldK.Language, oldK.AIError
+	k.Background = oldK.Background // written by the reader, not the editor
 	r, err := a.Store.Create(ctx, domain.Record{Owner: owner, Kind: "knowledge", Parent: lessonID, Course: lesson.Course, Lesson: lessonID, Version: old.Version + 1, Data: domain.Encode(k)})
 	if err != nil {
 		return r, err
@@ -460,6 +461,11 @@ func (a *App) Summary(ctx context.Context, owner, course string) (map[string]any
 			return nil, err
 		}
 		out["course"] = p
+		changed, err := a.BackgroundChanged(ctx, owner, course)
+		if err != nil {
+			return nil, err
+		}
+		out["background_changed"] = changed
 	}
 	for _, kind := range []string{"lesson", "source", "knowledge", "request", "preview", "task", "step", "artifact", "chapter", "event"} {
 		r, err := a.Store.List(ctx, owner, store.Filter{Kind: kind, Course: course})

@@ -191,6 +191,75 @@ func (a *App) PriorLessons(ctx context.Context, owner, lessonID string) ([]domai
 	return ordered[:index], nil
 }
 
+// backgroundOf records the lessons now taught before lessonID; nil when the
+// lesson cannot be found.
+func (a *App) backgroundOf(ctx context.Context, owner, lessonID string) *domain.Background {
+	prior, err := a.PriorLessons(ctx, owner, lessonID)
+	if err != nil {
+		return nil
+	}
+	ids := make([]string, len(prior))
+	for i, r := range prior {
+		ids[i] = r.ID
+	}
+	return &domain.Background{Lessons: ids}
+}
+
+// BackgroundChanged lists the ids of a course's current knowledge and outputs
+// whose recorded background no longer matches the lessons now taught before
+// their lesson (PriorLessons): lessons were reordered, moved between chapters,
+// added before it or deleted. Only which lessons came before matters, not
+// their order among themselves. Records without a background (rule-based
+// knowledge, the syllabus, outputs from before backgrounds were recorded) are
+// never listed.
+func (a *App) BackgroundChanged(ctx context.Context, owner, course string) ([]string, error) {
+	ordered, err := a.OrderedLessons(ctx, owner, course)
+	if err != nil {
+		return nil, err
+	}
+	prior := map[string]map[string]bool{}
+	current := map[string]bool{} // the knowledge each lesson uses now
+	seen := map[string]bool{}
+	for _, r := range ordered {
+		prior[r.ID] = maps.Clone(seen)
+		seen[r.ID] = true
+		if l, err := domain.Decode[domain.Lesson](r.Data); err == nil && l.KnowledgeID != "" {
+			current[l.KnowledgeID] = true
+		}
+	}
+	changed := func(lesson string, b *domain.Background) bool {
+		now, ok := prior[lesson]
+		if b == nil || !ok {
+			return false
+		}
+		then := map[string]bool{}
+		for _, id := range b.Lessons {
+			then[id] = true
+		}
+		return !maps.Equal(then, now)
+	}
+	out := []string{}
+	knowledge, err := a.Store.List(ctx, owner, store.Filter{Kind: "knowledge", Course: course})
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range knowledge {
+		if k, err := domain.Decode[domain.Knowledge](r.Data); err == nil && current[r.ID] && changed(r.Lesson, k.Background) {
+			out = append(out, r.ID)
+		}
+	}
+	outputs, err := a.Store.List(ctx, owner, store.Filter{Kind: "artifact", Course: course})
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range outputs {
+		if art, err := domain.Decode[domain.Artifact](r.Data); err == nil && changed(r.Lesson, art.Background) {
+			out = append(out, r.ID)
+		}
+	}
+	return out, nil
+}
+
 // MergeSettings overlays the non-zero fields of over onto base. Zero values
 // mean "inherit", so a chapter or lesson stores only what it changes.
 func MergeSettings(base, over domain.OutputSettings) domain.OutputSettings {

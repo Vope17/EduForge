@@ -37,6 +37,8 @@ export interface Summary {
   task?: Rec<D.Task>[] | null
   step?: Rec<D.Step>[] | null
   artifact?: Rec<D.Artifact>[] | null
+  /** Ids of knowledge and outputs whose background lessons changed (App.BackgroundChanged). */
+  background_changed?: string[] | null
   chapter?: Rec<D.Chapter>[] | null
   event?: Rec<EventData>[] | null
   profile?: Rec<D.Profile>[] | null

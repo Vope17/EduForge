@@ -255,6 +255,7 @@ func (a *App) StartRequest(ctx context.Context, owner, requestID, ui string, use
 	for _, target := range targets {
 		// What earlier lessons of the course taught is background, not new.
 		known := research.BackgroundConcepts(a.priorKnowledge(ctx, owner, target.LessonID))
+		background := a.backgroundOf(ctx, owner, target.LessonID)
 		for _, kind := range target.Settings.Selected {
 			total := len(research.SectionOrder)
 			switch kind {
@@ -265,6 +266,7 @@ func (a *App) StartRequest(ctx context.Context, owner, requestID, ui string, use
 			}
 			t := domain.Task{RequestID: requestID, Type: kind, Status: "queued", Stage: "generate", Language: language(req, target, kind), KnowledgeID: target.KnowledgeID, Settings: target.Settings, Style: targetStyle(req, target, kind), Total: total}
 			t.ReadTerms = known
+			t.Background = background
 			out = append(out, domain.Record{Course: r.Course, Lesson: target.LessonID, Data: domain.Encode(t)})
 		}
 	}
@@ -624,7 +626,7 @@ func (a *App) process(ctx context.Context, owner, id string) error {
 		}
 	}
 	related := append([]string{}, t.RelatedKnowledge...)
-	art := domain.Artifact{GroupedLessons: t.GroupedLessons, RelatedKnowledge: related, Type: kind, Language: t.Language, KnowledgeID: t.KnowledgeID, RequestID: t.RequestID, TaskID: id, Style: t.Style, Settings: t.Settings, Sections: sections, Mode: mode}
+	art := domain.Artifact{GroupedLessons: t.GroupedLessons, RelatedKnowledge: related, Type: kind, Language: t.Language, KnowledgeID: t.KnowledgeID, RequestID: t.RequestID, TaskID: id, Style: t.Style, Settings: t.Settings, Sections: sections, Mode: mode, Background: t.Background}
 	support, err := a.ArtifactKnowledge(ctx, owner, art)
 	if err != nil {
 		return err
