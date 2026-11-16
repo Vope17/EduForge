@@ -1,6 +1,6 @@
 # AGENTS.md — EduForge
 
-給所有 AI 程式碼助理。開始前先讀 [docs/rebuild-plan.md](docs/rebuild-plan.md)；與本文衝突時以規劃書為準，與使用者當次明確要求衝突時請先指出。
+給所有 AI 程式碼助理。開始前先讀 [docs/progress.md](docs/progress.md)（目前狀態、進行中的分支、下一步）與 [docs/rebuild-plan.md](docs/rebuild-plan.md)；與本文衝突時以規劃書為準，與使用者當次明確要求衝突時請先指出。
 
 ## 產品
 
@@ -13,18 +13,11 @@
 
 產出代號（沿用 Paper2Lab 的資料格式）：`A` 講義、`B` 課堂簡報、`C` 教案、`D` 學習單、`S` 教學大綱（課程層級，沒有 lesson）。**介面只顯示名稱，不顯示代號。** C、D、S 的內容在 `Artifact.Plan`、`Worksheet`、`Syllabus`（結構化），提示詞、解析與檢查在 `internal/research/structured.go`，匯出在 `internal/artifacts/structured_export.go`、`plan_form.go`。講義的段落見 `internal/research/handout.go`（`HandoutParts`），簡報的規劃與寫作見 `deck.go`。
 
-## 進度與下一步
+## 進度
 
 第 1 期（結構、`docread`、知識）、第 2 期（講義、課堂簡報）、第 3 期（教案、學習單、教學大綱）完成，各期與規劃書不同之處記在規劃書 §18–§20。**現在是第 4 期：真實教材驗收與切換**（規劃書 §12–§14）。
 
-已有：`scripts/real-material.mjs` 分階段（setup、status、knowledge、confirm、generate、export）用真實模型走完整流程並匯出檢查；唯讀展示模式（見「部署」）；一份以合成教材（資料結構：堆疊、佇列）生成的展示課程。
-
-待做，依序：
-
-1. 使用者提供一章真實教材（含掃描頁與 PPT 圖解），用 `real-material.mjs` 走完；記錄覆蓋率、失敗批次與模型錯誤。
-2. 規劃書 §13.2 的人工驗收：在 **Microsoft Word／PowerPoint** 實際開啟每種產出（目前只用 LibreOffice 轉圖檢查過）；用學校的教案表單驗證標籤填表。
-3. 依驗收結果修正，每個修正附測試。
-4. 使用者確認後切換（§14），在規劃書補「第 4 期實作紀錄」。
+**目前狀態、進行中的分支、下一步、觀察項目與已知問題都在 [docs/progress.md](docs/progress.md)**，那是唯一隨時更新的進度文件。
 
 不在這一期：教案／學習單／教學大綱的 AI 修改面板、文字範圍反白、多使用者。要做之前先改規劃書並經使用者同意。
 
@@ -78,7 +71,7 @@
 - **Go**：檔名 snake_case，依職責放進上表的套件；測試與被測檔同目錄、`_test.go`。錯誤代碼是 snake_case 字串（`read_only`、`plan_time_mismatch`），前端用同一個代碼翻譯。
 - **Vue 元件**：PascalCase，依區域放進 `components/` 子資料夾：`views/`（整頁）、`shell/`（外框）、`lesson/`、`generation/`、`editor/`、`templates/`、`settings/`、`dialogs/`、`tasks/`。跨區共用的放 `components/` 根目錄。一律 `<script setup lang="ts">`。
 - **前端邏輯**：camelCase 的 `lib/*.ts`，不放進元件。API 型別：Go struct 產生的在 `api/domain.ts`（不要手改），其他回傳形狀在 `api/types.ts`。
-- **文件**：設計變更寫進 `docs/rebuild-plan.md`，不另開文件；`AGENTS.md` 只放 AI 需要的規則與地圖。
+- **文件**：設計變更寫進 `docs/rebuild-plan.md`；目前狀態與待辦寫進 `docs/progress.md`；`AGENTS.md` 只放 AI 需要的規則與地圖。不另開其他文件。
 - 暫存檔、測試輸出不要放進專案目錄。
 
 ## 新增內容時
@@ -127,4 +120,4 @@ docker compose up -d --build   # 以目前程式碼重建並啟動
 
 ## 提交
 
-每個完成並驗證的步驟 commit 一次，在功能分支上；使用者說合併才合併，不主動 push。不要把使用者自己未提交的修改（例如本機的 `compose.yaml` 網路設定）混進你的 commit。
+每個完成並驗證的步驟 commit 一次，在功能分支上，**commit 前更新 `docs/progress.md`**（目前狀態、下一步、紀錄）；使用者說合併才合併，不主動 push。不要把使用者自己未提交的修改（例如本機的 `compose.yaml` 網路設定）混進你的 commit。
