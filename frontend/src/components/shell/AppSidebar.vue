@@ -56,7 +56,7 @@ function toggle(id: string) {
         <option value="" disabled>{{ t('selectCourse') }}</option>
         <option v-for="course in state.courses" :key="course.id" :value="course.id">{{ course.data.name }}</option>
       </select>
-      <button class="side-icon-button" :title="t('newCourse')" :aria-label="t('newCourse')" @click="addingCourse = true"><Icon name="plus" /></button>
+      <button v-if="!state.session?.read_only" class="side-icon-button" :title="t('newCourse')" :aria-label="t('newCourse')" @click="addingCourse = true"><Icon name="plus" /></button>
       <button v-if="state.courseID" class="side-icon-button" :title="t('deleteCourseButton')" :aria-label="t('deleteCourseButton')" @click="deleteCourse"><Icon name="trash" /></button>
     </div>
 
@@ -103,13 +103,13 @@ function toggle(id: string) {
       </template>
       <p v-if="state.courseID && !lessons.length" class="side-empty">{{ t('noLessonsYet') }}</p>
     </nav>
-    <button v-if="state.courseID" class="sidebar-new" @click="addingLesson = true"><Icon name="plus" /> {{ t('addLesson') }}</button>
+    <button v-if="state.courseID && !state.session?.read_only" class="sidebar-new" @click="addingLesson = true"><Icon name="plus" /> {{ t('addLesson') }}</button>
     <button v-if="state.selected.length" class="batch-button" @click="go({ name: 'batch', course: state.courseID })">
       <Icon name="layers" /> {{ t('batchStudio') }} · {{ state.selected.length }}
     </button>
 
     <div class="sidebar-bottom">
-      <button class="side-link" :class="{ active: route.name === 'settings' }" @click="go({ name: 'settings', tab: 'providers' })">
+      <button v-if="!state.session?.read_only" class="side-link" :class="{ active: route.name === 'settings' }" @click="go({ name: 'settings', tab: 'providers' })">
         <Icon name="gear" /> {{ t('settings') }}
       </button>
       <div class="language-switch">

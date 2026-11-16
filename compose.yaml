@@ -13,9 +13,12 @@ services:
     ports:
       - "127.0.0.1:${EDUFORGE_PORT:-8081}:8080"
     environment:
-      EDUFORGE_ORIGINS: "http://127.0.0.1:8080,http://127.0.0.1:${EDUFORGE_PORT:-8081},http://localhost:${EDUFORGE_PORT:-8081}"
+      # Browser URLs allowed to reach EduForge (also the allowed Host headers). Set in .env; see .env.example.
+      EDUFORGE_ORIGINS: "${EDUFORGE_ORIGINS:-http://127.0.0.1:8080,http://127.0.0.1:${EDUFORGE_PORT:-8081},http://localhost:${EDUFORGE_PORT:-8081}}"
       # Pages allowed to show EduForge in a frame: the iLearn portal. Empty forbids framing.
       EDUFORGE_FRAME_ANCESTORS: "${EDUFORGE_FRAME_ANCESTORS-http://127.0.0.1:8090 http://localhost:8090}"
+      # 1 makes the site a read-only showcase: browsing works, changes and generation are refused.
+      EDUFORGE_READONLY: "${EDUFORGE_READONLY:-0}"
     volumes:
       - eduforge-data:/data
       - eduforge-secrets:/secrets

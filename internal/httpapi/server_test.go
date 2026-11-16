@@ -42,6 +42,31 @@ func TestHostOriginAndWriteToken(t *testing.T) {
 		}
 	}
 }
+func TestReadOnlyRefusesWritesButKeepsReading(t *testing.T) {
+	s := handler(t)
+	s.ReadOnly = true
+	do := func(method, path, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, "http://localhost:8080"+path, strings.NewReader(body))
+		req.Header.Set("X-EduForge-Token", s.Token)
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		return rec
+	}
+	for _, w := range []struct{ method, path string }{{"POST", "/api/courses"}, {"PUT", "/api/preferences"}, {"DELETE", "/api/records/x"}, {"POST", "/api/providers/x/login"}} {
+		if rec := do(w.method, w.path, `{}`); rec.Code != 403 || !strings.Contains(rec.Body.String(), "read_only") {
+			t.Fatalf("%s %s: %d %s", w.method, w.path, rec.Code, rec.Body.String())
+		}
+	}
+	if rec := do("GET", "/api/courses", ""); rec.Code != 200 {
+		t.Fatalf("read refused: %d", rec.Code)
+	}
+	if rec := do("GET", "/api/session", ""); !strings.Contains(rec.Body.String(), `"read_only":true`) {
+		t.Fatalf("session: %s", rec.Body.String())
+	}
+	if rec := do("POST", "/api/math", `{"formulas":[]}`); rec.Code != 200 {
+		t.Fatalf("math refused: %d %s", rec.Code, rec.Body.String())
+	}
+}
 func TestClientCannotAssignAnOwner(t *testing.T) {
 	s := handler(t)
 	req := httptest.NewRequest(http.MethodPost, "http://localhost:8080/api/courses", strings.NewReader(`{"name":"Research","owner_user_id":"someone-else"}`))

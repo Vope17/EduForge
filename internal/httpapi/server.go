@@ -35,6 +35,9 @@ type Server struct {
 	// FrameAncestors lists the origins (space-separated) allowed to show EduForge in a frame, such as the iLearn
 	// portal. Empty means no page may frame it.
 	FrameAncestors string
+	// ReadOnly turns the site into a public showcase: every request that would change data or call a model is
+	// refused with read_only. Only formula rendering, which changes nothing, may still be posted.
+	ReadOnly bool
 }
 
 func New(a *app.App, web string, origins []string) *Server {
@@ -68,6 +71,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if origin := r.Header.Get("Origin"); origin != "" && !s.Origins[origin] {
 		writeError(w, errors.New("invalid_origin"), http.StatusForbidden)
+		return
+	}
+	if s.ReadOnly && r.Method != "GET" && r.Method != "HEAD" && !(r.Method == "POST" && r.URL.Path == "/api/math") {
+		writeError(w, errors.New("read_only"), http.StatusForbidden)
 		return
 	}
 	if r.Method != "GET" && r.Method != "HEAD" && r.Header.Get("X-EduForge-Token") != s.Token {
@@ -132,7 +139,7 @@ func (s *Server) routes() {
 		return nil
 	})
 	s.handle("GET /api/session", func(w http.ResponseWriter, r *http.Request) error {
-		writeJSON(w, 200, map[string]any{"owner_user_id": owner(r), "csrf_token": s.Token, "single_user": true})
+		writeJSON(w, 200, map[string]any{"owner_user_id": owner(r), "csrf_token": s.Token, "single_user": true, "read_only": s.ReadOnly})
 		return nil
 	})
 	s.handle("GET /api/system", func(w http.ResponseWriter, r *http.Request) error {

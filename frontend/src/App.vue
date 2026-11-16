@@ -57,6 +57,7 @@ watch(() => state.language, lang => { document.documentElement.lang = lang }, { 
     <AppSidebar />
     <main class="workspace">
       <TopBar />
+      <div v-if="state.session?.read_only" class="readonly-banner" role="note">{{ t('readOnlyNotice') }}</div>
       <div v-if="state.error" class="error-banner" role="alert">
         <span>{{ explain(state.error) }}</span>
         <button :aria-label="t('close')" @click="state.error = ''">×</button>

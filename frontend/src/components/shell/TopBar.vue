@@ -33,7 +33,7 @@ const crumbs = computed(() => {
     </nav>
     <div class="topbar-actions">
       <button
-        class="conn-chip" :class="conn.checking ? 'checking' : conn.mode"
+        v-if="!state.session?.read_only" class="conn-chip" :class="conn.checking ? 'checking' : conn.mode"
         :title="t('connectionTitle')" @click="go({ name: 'settings', tab: 'providers' })"
       >
         <span class="conn-dot"></span><span class="conn-label">{{ connLabel }}</span>

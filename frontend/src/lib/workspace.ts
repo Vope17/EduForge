@@ -62,6 +62,8 @@ export function createWorkspace() {
 
   // Calls the JSON API. T is the reply's type; errors throw the server's code.
   async function api<T = unknown>(path: string, { method = 'GET', body, ...options }: ApiOptions = {}): Promise<T> {
+    // Showcase mode: refuse changes here too, so visitors get the explanation without a round trip.
+    if (state.session?.read_only && method !== 'GET' && path !== '/math') throw new Error('read_only')
     const headers: Record<string, string> = { ...options.headers }
     if (method !== 'GET') headers['X-EduForge-Token'] = state.session?.csrf_token || ''
     const multipart = body instanceof FormData
@@ -156,6 +158,7 @@ export function createWorkspace() {
   async function setLanguage(lang: string) {
     state.language = lang
     try { localStorage.setItem('eduforge-language', lang) } catch {}
+    if (state.session?.read_only) return
     await act(() => api('/preferences', { method: 'PUT', body: { key: 'ui_language', value: lang } }), { success: false })
   }
 

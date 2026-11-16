@@ -51,4 +51,6 @@ export interface Session {
   owner_user_id: string
   csrf_token: string
   single_user: boolean
+  /** Showcase mode: the server refuses every change (EDUFORGE_READONLY). */
+  read_only: boolean
 }

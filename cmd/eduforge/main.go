@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -92,6 +93,7 @@ func serve(args []string) error {
 	defer application.Stop()
 	api := httpapi.New(application, *web, httpapi.DefaultOrigins(*listen))
 	api.FrameAncestors = httpapi.FrameAncestors()
+	api.ReadOnly, _ = strconv.ParseBool(os.Getenv("EDUFORGE_READONLY"))
 	server := httpapi.HTTPServer(api, *listen)
 	go func() {
 		<-ctx.Done()
